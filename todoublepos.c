@@ -1,6 +1,6 @@
 /* 
-   tofloat: convert positions in SDF files from float to double; copy
-       other file contents to output unchanged
+   todoublepos: convert positions in SDF files from float to double;
+       copy other file contents to output unchanged
 
    DONE: 1) get list of names in SDF file
    DONE: 2) read all scalars
@@ -26,7 +26,6 @@ typedef union {
 
 static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp);
 static void writeinit(FILE *fp);
-static int inlist(char *name, FILE *fp);
 static void writescalars(SDF *sdfp, FILE *fp);
 static void writestructs(SDF *sdfp, FILE *fp);
 
@@ -80,27 +79,6 @@ static void writeinit(FILE *fp)
 {
     fprintf(fp, "# SDF\n");
     fprintf(fp, "parameter byteorder = %#x;\n", SDFcpubyteorder());
-}
-
-static int inlist(char *name, FILE *fp)
-{
-    char line[64];
-    int nomatch = 1;
-
-    rewind(fp);
-
-    while (fgets(line, sizeof(line), fp) != NULL) {
-	if (strlen(name) != (strlen(line)-1)) continue;
-	nomatch = strncmp(name, line, strlen(line)-1);
-	if (!nomatch) break;
-    }
-
-    if (ferror(fp)) {
-	fprintf(stderr, "%s\n", strerror(errno));
-	exit(errno);
-    }
-
-    return !nomatch;
 }
 
 static void writescalars(SDF *sdfp, FILE *fp)
