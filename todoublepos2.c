@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -146,8 +147,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
     size_t stride = 0, outstride = 0;
     void *btab, *outbtab;
     void **addrs;
-    int *strides, *nobjs, *starts, *todouble, *inoffsets, *outoffsets;
-    double tmp;
+    int *strides, *nobjs, *starts, *inoffsets, *outoffsets;
+    double x, y, z;
+    float radius, mass;
 
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
@@ -165,7 +167,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
     nobjs = (int *)malloc(nmembers * sizeof(int));
     starts = (int *)malloc(nmembers * sizeof(int));
     types = (SDF_type_t *)malloc(nmembers * sizeof(SDF_type_t));
-    todouble = (int *)malloc(nmembers * sizeof(int));
     inoffsets = (int *)malloc(nmembers * sizeof(int));
     outoffsets = (int *)malloc(nmembers * sizeof(int));
 
@@ -182,16 +183,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    types[nmembers] = SDFtype(members[nmembers], sdfp);
 	    inoffsets[nmembers] = stride;
 	    stride += SDFtype_sizes[types[nmembers]];
-
-	    if ( ( (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) ||
-		   (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) ||
-		   (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) ) &&
-		 (types[nmembers] == SDF_FLOAT) ) {
-		todouble[nmembers] = 1;
-	    }
-	    else {
-		todouble[nmembers] = 0;
-	    }
 
 	    ++nmembers;
 	}
@@ -212,25 +203,41 @@ static void writestructs(SDF *sdfp, FILE *fp)
     for (i = 0, outstride = 0; i < nmembers; ++i) {
 /*calculate at what byte-intervals the data should be written-CE*/
 	outoffsets[i] = outstride;
-	outstride += SDFtype_sizes[ todouble[i] ? SDF_DOUBLE : types[i] ];
+	outstride += SDFtype_sizes[ types[i] ];
     }
 
 /*malloc enough space in memory for the array that holds the whole output data-CE*/
     outbtab = (void *)malloc(nobjs[0] * outstride);
 
     for (j = 0; j < nobjs[0]; ++j) {
+        x = *((double *)(btab + j*stride + inoffsets[0]));
+        y = *((double *)(btab + j*stride + inoffsets[1]));
+        z = *((double *)(btab + j*stride + inoffsets[2]));
+        radius = sqrt( x*x + y*y + z*z );
+
 	for (i = 0; i < nmembers; ++i) {
-	    if (todouble[i]) {
-		tmp = (double)(*(float *)(btab + j*stride + inoffsets[i]));
-/*copy outbtab to/from memory-CE*/
-		memcpy(outbtab + j*outstride + outoffsets[i],
-		       &tmp, SDFtype_sizes[SDF_DOUBLE]);
-	    }
-	    else {
+            if( !strncmp(members[i], "mass", strlen( members[i] )) ) {
+	        mass = *((float *)(btab + j*stride + inoffsets[i]));
+
+                if( (radius < 3.1e-2) && (mass > 5.0) ) {
+                    printf("resizing mass %G at r= %G ", mass, radius);
+                    mass = mass/2.;
+                    printf("to %G\n", mass);
+		    memcpy(outbtab + j*outstride + outoffsets[i],
+		           &mass, SDFtype_sizes[types[i]]);
+                }
+                else {
+		    memcpy(outbtab + j*outstride + outoffsets[i],
+		           btab + j*stride + inoffsets[i],
+		           SDFtype_sizes[types[i]]);
+                }
+
+            }
+            else {
 		memcpy(outbtab + j*outstride + outoffsets[i],
 		       btab + j*stride + inoffsets[i],
 		       SDFtype_sizes[types[i]]);
-	    }
+            }
 	}
     }
 
@@ -242,12 +249,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    fprintf(fp, "\tint %s;\n", members[i]);
 	    break;
 	case SDF_FLOAT:
-	    if (todouble[i]) {
-		fprintf(fp, "\tdouble %s;\n", members[i]);
-	    }
-	    else {
-		fprintf(fp, "\tfloat %s;\n", members[i]);
-	    }
+	    fprintf(fp, "\tfloat %s;\n", members[i]);
 	    break;
 	case SDF_DOUBLE:
 		fprintf(fp, "\tdouble %s;\n", members[i]);
@@ -271,7 +273,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
     free(nobjs);
     free(starts);
     free(types);
-    free(todouble);
     free(inoffsets);
     free(outoffsets);
 

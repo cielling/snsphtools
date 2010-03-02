@@ -1,0 +1,25 @@
+# Try "make CC-icc ARCH=[your usual ARCH value]"
+
+CPPFLAGS = -I$(TREEHOME)/include -wd1338,810,592,593
+CFLAGS = -g -O0 -Wall
+LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
+LDLIBS = -lsw
+
+#PROGS = todoublepos
+#PROGS= readsection2
+#PROGS= addabundance2
+#PROGS = mergeSDFs2
+PROGS = maketraj2
+
+.PHONY: all clean
+
+all: $(PROGS)
+
+#todoublepos: todoublepos.o
+#readsection2: readsection2.o
+#addabundance2: addabundance2.o
+#mergeSDFs2: mergeSDFs2.o
+maketraj2: maketraj2.o
+
+clean:
+	-$(RM) $(PROGS) *.o *~
