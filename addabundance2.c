@@ -169,6 +169,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     float **abundarr; /*should this be void * ? */
     double x, y, z, radius;
     float *radbin;
+    float tmpval1, tmpval2;
 
     SDFgetint(sdfp, "npart", &nrecs);
     printf("%d particles\n", nrecs);
@@ -252,7 +253,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     }
 
     /*malloc enough space in memory for the array that holds the whole output data-CE*/
-    printf("about to malloc %u bytes for outbtab\n", nrecs*outstride);
+    printf("about to malloc %u bytes for outbtab\n", outstride);
     outbtab = (void *)malloc( outstride );
 
     /* now need to read in the abundances, and other necessary stuff */
@@ -278,16 +279,27 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fap = fopen("inputh.dat", "r");
     if (!fap) printf("error opening inputh.dat\n");
 
-    /*malloc array and read in radial bins. don't know how many, but guess 1000
-      and realloc later if we run out of space -CE */
-    radbin = (float *)malloc(1000 * sizeof(float));
-
+    /* why is Nbins after his one less than after the next loop? */
     Nbins = 0;
     do {
-        fscanf(fap, "%21G", &radbin[Nbins++]);
-        fscanf(fap, "%*21g"); /* reads in h's. not needed */
+        fscanf(fap,"%E %E\n", &tmpval1, &tmpval2);
+        ++Nbins;
+    } while(!feof(fap));
+    /*} while(radbin[Nbins-1] < 4.3e2);*/
+    printf("Nbins: %d ",Nbins);
+
+    rewind(fap);
+
+    radbin = (float *)malloc(Nbins * sizeof(float));
+    if(!radbin) printf("error allocating radbin\n");
+
+    for( i = 0; i < Nbins; i++) {
+        fscanf(fap, "%E %*E", &radbin[i]);
+    /* realloc seems to be dangerous and perhaps causing occasional seg faults
+     * and is disliked by valgrind.
         if(!(Nbins % 1000)) realloc(radbin, (Nbins+1000)*sizeof(float));
-    } while(radbin[Nbins-1] < 4.3e2);
+     */
+     }
 
     fclose(fap);
     fap = NULL;
@@ -349,11 +361,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    exit(-1);
 	}
     }
-    fprintf(fp, "}[%d];\n", nobjs);
+    fprintf(fp, "}[%d];\n", nrecs);
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
 
     for (j = 0; j < nrecs; ++j) {
+        //printf("%8d ",j);
         /* read one line of data into btab (via addrs) */
         SDFseekrdvecsarr(sdfp, nmembers, members, starts, nobjs, addrs,
 		     strides);
@@ -366,7 +379,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /*quick bisection to locate the radial bin I'm in -CE */
         if (radius >= radbin[Nbins-1])
-            jl = Nbins;
+            jl = Nbins-1;
         else if (radius <= radbin[0])
             jl = 0;
         else {
@@ -386,6 +399,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	           SDFtype_sizes[ types[i] ]);
             starts[i] = j+1;
 	}
+	    printf("j=%8d, i= %4d, k=%2d, jl=%4d\n",j,i,k,jl);
 /* which index holds my bin number? -CE: jl */
         /* now populate outbtab with abundances 'n stuff */
         for (i = 0, counter = 0; i < numA; i++) {

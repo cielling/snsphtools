@@ -342,7 +342,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /*quick bisection to locate the radial bin I'm in -CE */
         if (radius >= radbin[Nbins-1])
-            jl = Nbins;
+            jl = Nbins-1;
         else if (radius <= radbin[0])
             jl = 0;
         else {

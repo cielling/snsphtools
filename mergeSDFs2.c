@@ -30,6 +30,8 @@ typedef union {
     double d;
 } datum_t;
 
+int GetNumOfDigits(int number);
+
 static void initargs(int argc, char *argv[], SDF **sdfp1, SDF **sdfp2, FILE **fp);
 static void writeinit(FILE *fp);
 /*static void writescalars(SDF *sdfp1, FILE *fp, fpos_t *pos_npart, int npart);*/
@@ -163,10 +165,6 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int npart)
     *pos_npart = pos;
 }
 
-int countmbrs(char ***vecs, int *nvecs, SDF *sdfp);
-void initmbrs(char ***, int , char **, SDF_type_t **, int **, int **, int **, SDF *);
-int GetNumOfDigits(int number);
-
 /*this writes the actual data*/
 static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 {
@@ -194,6 +192,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     nvecs1 = SDFnvecs(sdfp1);
     vecs1 = SDFvecnames(sdfp1);
 
+    flag = 0;
     for (i = 0, nmembers1 = 0; i < nvecs1; ++i) {
         if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) {
             /* x is the first member of the structure */
@@ -205,6 +204,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     nvecs2 = SDFnvecs(sdfp2);
     vecs2 = SDFvecnames(sdfp2);
 
+    flag = 0;
     for (i = 0, nmembers2 = 0; i < nvecs2; ++i) {
         if (strncmp(vecs2[i], "x", strlen(vecs2[i])) == 0) {
             /* x is the first member of the structure */
@@ -224,8 +224,9 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 /* need to figure out how to update npart in the header, since in the future
    that number will probably change from the inputfiles -CE */
 
-    if( nmembers1 <= nmembers2) maxmbrs = nmembers1;
-    else maxmbrs = nmembers2;
+    if( nmembers1 <= nmembers2) {
+       maxmbrs = nmembers1;
+    } else { maxmbrs = nmembers2;}
 
 /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc(maxmbrs * sizeof(char *));
@@ -240,6 +241,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
     /* find the file with the fewer members and write that to output */
 
+    flag = 0;
     if ( nmembers1 < nmembers2) {
 /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs1; ++i) {
@@ -287,7 +289,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     printf("printing header\n");
 
     if (nmembers1 < nmembers2) {
-        writescalars(sdfp1, fp, &pos_npart,npart1+npart2);
+        writescalars(sdfp2, fp, &pos_npart,npart1+npart2);
     } else {
         writescalars(sdfp1, fp, &pos_npart,npart1+npart2);
     }
@@ -318,7 +320,8 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
     /*calculate the byte offset in memory to the address of the next member-CE*/
     addrs[0] = (char *)btab;
-    for (i=1; i< maxmbrs; i++) addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
+    for (i=1; i< maxmbrs; i++)
+         addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
 
 /*loop over each file consecutively in chunks of data, write that chunk to file*/
     printf("getting file 1 .... ");
@@ -336,11 +339,11 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         radius = sqrt(x*x + y*y + z*z);
 
 	/*dump the btab data into the file now-CE*/
-        if( radius < R0 ) {
+        if( (radius < R0 ) ) {
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
-        else if( radius == -99. ) {
+        else if( R0 < 0.0 ) {
             fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
@@ -379,7 +382,9 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     /* update npart to the new value */
     fsetpos(fp, &pos1_npart);
     fprintf(fp, "}[%d];", newnpart);
-    while(digits > newdigits){ /*add blanks in case newnpart has fewer digits than npart1+npart2*/
+
+    /*add blanks in case newnpart has fewer digits than npart1+npart2*/
+    while(digits > newdigits) {
         fprintf(fp, " ");
         digits--;
     }
@@ -403,46 +408,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     /*free(outbtab);*/
 }
 
-int countmbrs(char ***vecs, int *nvecs, SDF *sdfp) {
-    int i, nmembers, flag = 0;
-
-    *nvecs = SDFnvecs(sdfp);
-    vecs = SDFvecnames(sdfp);
-
-    for (i = 0, nmembers = 0; i < *nvecs; ++i) {
-        if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) {
-            /* x is the first member of the structure */
-            flag=1;
-        }
-	if (flag) ++nmembers;
-    }
-
-    return nmembers;
-}
-
-void initmbrs(char ***members, int nvecs, char **vecs, SDF_type_t **types, int **inoffsets, int **strides, int **lines, SDF *sdfp) {
-    int i, flag = 0, nmembers, stride, incr=1;
-
-    flag=0;
-
-/*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
-    for (i = 0, stride = 0, nmembers = 0; i < nvecs; ++i) {
-        if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag=1;
-        if(flag) {
-	    *members[nmembers] = vecs[i];
-            /*printf("vecs1= %s vecs2= %s\n", members1[nmembers], members2[nmembers]);*/
-	    *types[nmembers] = SDFtype(*members[nmembers], sdfp);
-	    *inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
-                                            of data (struct member) */
-	    stride += SDFtype_sizes[*types[nmembers]];
-            *lines[nmembers] = incr;
-            nmembers++;
-	}
-    }
-    for (i = 0; i < nmembers; i++)
-        *strides[i] = stride;
-
-}
 
 int GetNumOfDigits(int number) {
     int digits = 1;

@@ -7,10 +7,10 @@ LDLIBS = -lsw
 
 #PROGS = todoublepos2
 #PROGS= readsection
-#PROGS= addabundance
+PROGS= addabundance
 #PROGS= mergeSDFs
 #PROGS= SDFtoASCII-batch
-PROGS= maketraj
+#PROGS= maketraj
 
 .PHONY: all clean
 
@@ -18,10 +18,10 @@ all: $(PROGS)
 
 #todoublepos2: todoublepos2.o
 #readsection: readsection.o
-#addabundance: addabundance.o
+addabundance: addabundance.o
 #mergeSDFs: mergeSDFs.o
 #SDFtoASCII-batch: SDFtoASCII-batch.o
-maketraj: maketraj.o
+#maketraj: maketraj.o
 
 clean:
 	-$(RM) $(PROGS) *.o *~
