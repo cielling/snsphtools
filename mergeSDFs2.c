@@ -98,7 +98,6 @@ static void writeinit(FILE *fp)
     fprintf(fp, "# SDF\n");
     fprintf(fp, "parameter byteorder = %#x;\n", SDFcpubyteorder());
     fgetpos(fp, &pos1);
-    printf("hello\n");
 }
 
 static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int npart)
@@ -177,7 +176,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     int *inoffsets, *strides, *starts, *lines;
     int incr=1, stride = 0, flag=0;
     int npart1, npart2, newnpart, countnpart;
-    int digits, newdigits;
+    int digits, newdigits,ident, idindex, identmax = 0;
     fpos_t pos1_npart, pos_npart;
     double x, y, z;
     float radius, R0;
@@ -188,7 +187,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
        avoid. But I know that the structure (so far) always has "x" as the first
        member, so I can start counting from there -CE */
 
-    printf("writing structs\n");
     nvecs1 = SDFnvecs(sdfp1);
     vecs1 = SDFvecnames(sdfp1);
 
@@ -212,7 +210,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         }
 	if (flag) ++nmembers2;
     }
-    printf("%d  %d\n", nmembers1, nmembers2);
 
     printf("Enter merge radius or -99. : ");
     scanf("%f", &R0);
@@ -245,10 +242,11 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     if ( nmembers1 < nmembers2) {
 /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs1; ++i) {
+
             if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) flag=1;
+
             if(flag) {
 	        members[nmembers] = vecs1[i];
-                /*printf("vecs1= %s vecs2= %s\n", members1[nmembers], members2[nmembers]);*/
 	        types[nmembers] = SDFtype(members[nmembers], sdfp1);
 	        inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
                                             of data (struct member) */
@@ -256,16 +254,22 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
                 lines[nmembers] = incr;
                 nmembers++;
             }
+
+            /* get index that holds 'ident' for later updating */
+            if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
+
         }
         for (i = 0; i < nmembers; i++)
             strides[i] = stride;
+
     } else {
 /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs2; ++i) {
+
             if (strncmp(vecs2[i], "x", strlen(vecs2[i])) == 0) flag=1;
+
             if(flag) {
 	        members[nmembers] = vecs2[i];
-                /*printf("vecs1= %s vecs2= %s\n", members1[nmembers], members2[nmembers]);*/
 	        types[nmembers] = SDFtype(members[nmembers], sdfp2);
 	        inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
                                             of data (struct member) */
@@ -273,9 +277,14 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
                 lines[nmembers] = incr;
                 nmembers++;
 	    }
+
+            /* get index that holds 'ident' for later updating */
+            if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
+
         }
         for (i = 0; i < nmembers; i++)
             strides[i] = stride;
+
     }
 
     /* unnecesary, just use 'stride' ? CE */
@@ -333,6 +342,8 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         /* read data into btab (via addrs) */
         SDFseekrdvecsarr(sdfp1, maxmbrs, members, starts, lines, addrs, strides);
 
+        ident = *((int *)(btab + inoffsets[idindex]));
+
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
@@ -342,10 +353,14 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         if( (radius < R0 ) ) {
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
+            if(ident > identmax)
+               identmax = ident;
         }
         else if( R0 < 0.0 ) {
             fwrite(btab, outstride, 1, fp);
             countnpart++;
+            if(ident > identmax)
+               identmax = ident;
         }
 
     }
@@ -360,6 +375,11 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
         /* read data into btab (via addrs) */
         SDFseekrdvecsarr(sdfp2, maxmbrs, members, starts, lines, addrs, strides);
+
+        /* update the particle id, so it does not start at 1 again */
+        ident = *((int *)(btab + inoffsets[idindex]));
+        ident += identmax + 1;
+        memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
 
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));

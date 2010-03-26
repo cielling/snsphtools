@@ -158,8 +158,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int numA, Nbins, len, counter, flag = 0;
     int nrecs;
     int *strides, *nobjs, *starts, *inoffsets, *outoffsets, *nparr, *nnarr;
-    int want[2][NISO]={{0,1,2,6,7,8,10,12,14,15,16,18,20,20,22,24,26,26,26,27,28,28},/*Z*/
-                       {1,0,2,6,7,8,10,12,14,16,16,18,20,24,22,24,26,30,32,29,28,30}}; /*A-Z*/
+    int want[2][NISO]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,22,24,26,26,26,27,28},/*Z*/
+                       {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,26,24,26,28,30,29,28}}; /*A-Z*/
     char **vecs, **members, **outmembers;
     char mychar[5];
     SDF_type_t *types, *outtypes;
@@ -399,7 +399,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	           SDFtype_sizes[ types[i] ]);
             starts[i] = j+1;
 	}
-	    printf("j=%8d, i= %4d, k=%2d, jl=%4d\n",j,i,k,jl);
 /* which index holds my bin number? -CE: jl */
         /* now populate outbtab with abundances 'n stuff */
         for (i = 0, counter = 0; i < numA; i++) {
