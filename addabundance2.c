@@ -36,6 +36,10 @@ static void writestructs(SDF *sdfp, FILE *fp);
 
 static const int NISO = 22;
 
+void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
+
+double get_ye(float abundarr[], int nparr[], int nnarr[], int Niso);
+
 int main(int argc, char *argv[])
 {
     SDF *sdfp = NULL;
@@ -153,7 +157,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
 
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    FILE *fap = NULL;
+    FILE *fap = NULL, *frp = NULL;
     int i, j, k, nvecs, nmembers, Amembers, ju, jm, jl;
     int numA, Nbins, len, counter, flag = 0;
     int nrecs;
@@ -167,9 +171,13 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *btab, *outbtab;
     void **addrs;
     float **abundarr; /*should this be void * ? */
+    float *newabund;
     double x, y, z, radius;
     float *radbin;
     float tmpval1, tmpval2;
+
+    frp = fopen("log.out","w");
+    if(!frp) printf("error opening log file!\n");
 
     SDFgetint(sdfp, "npart", &nrecs);
     printf("%d particles\n", nrecs);
@@ -313,6 +321,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (!abundarr[i]) printf("error allocating abundarr[i]\n");
     }
 
+    newabund = (float *)malloc(NISO * sizeof( float ));
+    if (!newabund) printf("error allocating newabund\n");
+
     /* read in abundance data - WORKS!!*/
     fap = fopen("abun.dat", "r");
     if (!fap) printf("error opening file abun.dat\n");
@@ -399,6 +410,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	           SDFtype_sizes[ types[i] ]);
             starts[i] = j+1;
 	}
+
+        /* renormalize abundances first */
+        renorm(want, newabund, abundarr[jl], nparr, nnarr, numA, NISO, frp);
+
 /* which index holds my bin number? -CE: jl */
         /* now populate outbtab with abundances 'n stuff */
         for (i = 0, counter = 0; i < numA; i++) {
@@ -408,7 +423,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
                 /* fill in abundances */
                 memcpy(outbtab + outoffsets[ k ],
-                   &abundarr[jl][i] , SDFtype_sizes[ outtypes[ k ] ]);
+                   &newabund[k] , SDFtype_sizes[ outtypes[ k ] ]);
+                   /*&abundarr[jl][i] , SDFtype_sizes[ outtypes[ k ] ]);*/
 
                 /* fill in nprotons in isotope */
                 memcpy(outbtab + outoffsets[ k+NISO ],
@@ -439,4 +455,117 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     free(btab);
     free(outbtab);
+}
+
+
+double get_ye(float abundarr[], int nparr[], int nnarr[], int Niso) {
+    int i;
+    double Ye;
+    Ye = 0.0;
+    for( i=0; i<Niso; i++) {
+        Ye += (double)abundarr[i] / (double)( nparr[i]+nnarr[i] ) * (double)nparr[i];
+    }
+    return Ye;
+}
+
+
+void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnw, FILE *frp) {
+    int i, j, is_in_arr, adjust;
+    int jl, jm, ju, fe56, count;
+    double Ye_old, Ye_new, sum, factor, factor1, eps=1.e-4;
+
+    for( i=0; i<Nnw; i++) newabund[i] = 0.0;
+
+    for( j=0; j<Niso; j++) {
+
+        is_in_arr = 0;
+
+        for( i=0; i<Nnw; i++) {
+            if((want[0][i] == nparr[j]) && (want[1][i] == nnarr[j])) {
+                newabund[i] += abundarr[j];
+                is_in_arr = 1;
+            }
+            if((want[0][i] == 26) && (want[1][i] == 30)) fe56 = i;
+        }
+
+        if(is_in_arr == 0) {
+            /* figure out where we are */
+            if (nparr[j] >= want[0][Nnw-1])
+                jl = Nnw-1;
+            else if (nparr[j] <= want[0][0])
+                jl = 0;
+            else {
+                ju = Nnw - 1;
+                jl = 0;
+                while (ju-jl > 1) {
+                   jm = (ju+jl) >> 1;
+                   if ((nparr[j] >= want[0][jm]) == (want[0][Nnw-1] >= want[0][0]))
+                      jl=jm;
+                   else
+                      ju=jm;
+                }
+            }
+
+            //printf("index: %3d, isotope: p=%2d n=%2d; put in ",jl,nparr[j],nnarr[j]);
+
+            /* determine appropriate abundance bin to stuff isotope into */
+            if(jl == 0) {
+                newabund[jl] += abundarr[j];
+            } else if(jl == Nnw-1) {
+                newabund[jl] += abundarr[j];
+            } else {
+                if(want[0][jl] >= nparr[j]) {
+                    if((want[0][jl]-nparr[j]) <= (nparr[j]-want[0][jl-1])) {
+                        newabund[jl] += abundarr[j];
+                        //printf("%2d: p=%2d\n",jl,want[0][jl]);
+                    } else {
+                        newabund[jl-1] += abundarr[j];
+                        //printf("%2d: p=%2d\n",jl-1,want[0][jl-1]);
+                    }
+                } else {
+                    if((want[0][jl+1]-nparr[j]) <= (nparr[j]-want[0][jl])) {
+                        newabund[jl+1] += abundarr[j];
+                        //printf("%2d: p=%2d\n",jl+1,want[0][jl+1]);
+                    } else {
+                        newabund[jl] += abundarr[j];
+                        //printf("%2d: p=%2d\n",jl,want[0][jl]);
+                    }
+                }
+            }
+        }
+    }
+
+    sum = 0.0;
+    for( i=0; i<Nnw; i++) sum += newabund[i];
+    if(fabs(sum - 1.0) > 1.e-3) fprintf(frp, "warning: mass fractions don't sum to 1: %E\n",sum);
+
+    /* check and adjust the Ye's */
+    count = 0;
+    do {
+        Ye_old = get_ye(abundarr, nparr, nnarr, Niso);
+        Ye_new = get_ye(newabund, want[0], want[1], Nnw);
+        if(fabs(Ye_old/Ye_new - 1.0) > eps) {
+        /* new Ye too small: decrease Fe56. new Ye too large: increase Fe56 */
+            factor = Ye_new/Ye_old;
+            factor1 = ( (1.0 - factor*newabund[fe56]) / (1.0-newabund[fe56]));
+            newabund[fe56] *= factor;
+            for( i=0; i<Nnw; i++) {
+                if(i != fe56) {
+                   newabund[i] *= factor1;
+                   if(newabund[i] < 0.000) fprintf(frp, "warning: negative abundance for %2d %2dafter %d iterations!\n",want[0][i],want[1][i],count);
+                }
+            }
+            adjust = 1;
+            count++;
+        } else {
+            adjust = 0;
+        }
+        if(count > (int)(2.0/eps)) adjust = 0;
+            adjust = 0;
+    } while (adjust == 1);
+    fprintf(frp, "adjusted Ye from %E to %E\n",Ye_old, Ye_new);
+
+    sum = 0.0;
+    for( i=0; i<Nnw; i++) sum += newabund[i];
+    if(fabs(sum - 1.0) > 1.e-3) fprintf(frp, "renorm warning: mass fractions don't sum to 1: %E\n",sum);
 }

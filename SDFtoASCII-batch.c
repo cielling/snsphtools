@@ -64,14 +64,14 @@ int main(int argc, char *argv[])
     }
 */
 
-    strcpy(outname, "test.dat.");
-    strcpy(sdfname, "/scratch/cellinge/run3g_50a_sph.");
+    strcpy(outname, "/scratch/cellinge/run3gcsm.dat.");
+    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50a1csm_sph.");
 
     printf("increment and number of last file: ");
     /*scanf("%d %d", &INCR, &nfile);*/
     INCR = 50;
-    nfile = 5000;
-    start = 0;
+    nfile = 5700;
+    start = 2500;
     printf("%d %d\n", INCR, nfile);
 
     for( i = start; i <= nfile; i = i+INCR ) {
@@ -149,7 +149,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *outbtab, *btab;
     void **addrs;
     int *inoffsets, *lines, *strides, *starts;
-    int INCR=1, flag=0, num=7;
+    int INCR=1, flag=0, num=6;
     int nlines = 1, nrecs;
     int index[num];
     /*make INCR and nlines user input */
@@ -173,10 +173,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
         }
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "vy", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "vz", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[6]=i;
+        if (strncmp(vecs[i], "temp", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "udot", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[5]=i;
 	if (flag) ++nmembers;
     }
     printf("nmembers = %d\n",nmembers);

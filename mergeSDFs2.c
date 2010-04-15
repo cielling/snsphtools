@@ -180,6 +180,8 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     fpos_t pos1_npart, pos_npart;
     double x, y, z;
     float radius, R0;
+    int abarr1[2][22], abarr2[2][22];
+    int abinfo1, abinfo2, first=1, abundflag=0,k;
     /*make INCR and nlines user input */
 
     /* Count structure members */
@@ -257,6 +259,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
             /* get index that holds 'ident' for later updating */
             if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
+            if(strncmp(vecs1[i],"p1",strlen(vecs1[i])) == 0) abinfo1=nmembers-1;
 
         }
         for (i = 0; i < nmembers; i++)
@@ -280,6 +283,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
             /* get index that holds 'ident' for later updating */
             if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
+            if(strncmp(vecs2[i],"p1",strlen(vecs2[i])) == 0) abinfo2=nmembers-1;
 
         }
         for (i = 0; i < nmembers; i++)
@@ -349,6 +353,14 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
 
+        if(first) {
+            for(k=0;k<22;k++){
+                abarr1[0][k] = *((int *)(btab + inoffsets[abinfo1+k]));/*Z*/
+                abarr1[1][k] = *((int *)(btab + inoffsets[abinfo1+22+k]));/*N*/
+            }
+        }
+        first=0;
+
 	/*dump the btab data into the file now-CE*/
         if( (radius < R0 ) ) {
 	    fwrite(btab, outstride, 1, fp);
@@ -365,6 +377,8 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
     }
     newnpart = countnpart;
+
+    first=1;
 
     printf("got %d lines\n",countnpart);
     printf("getting file 2 .... ");
@@ -386,6 +400,21 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
 
+        if(first) {
+            for(k=0;k<22;k++){
+                abarr2[0][k] = *((int *)(btab + inoffsets[abinfo2+k]));/*Z*/
+                abarr2[1][k] = *((int *)(btab + inoffsets[abinfo2+22+k]));/*N*/
+                if((abarr1[0][k] != abarr2[0][k]) || (abarr1[1][k] != abarr2[1][k]))
+                   abundflag=1;
+            }
+        }
+        if(first && (abundflag == 1)) {
+           printf("warning: abundance info in files might not be the same!\n");
+           printf("%10s %10s\n%5s%5s %5s%5s\n", "file1", "file2","p","n","p","n");
+           for(k=0;k<22;k++) printf("%5d%5d %5d%5d\n",
+               abarr1[0][k],abarr1[1][k],abarr2[0][k],abarr2[1][k]);
+        }
+        first=0;
 	/*dump the btab data into the file now-CE*/
         if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
 	    fwrite(btab, outstride, 1, fp);
