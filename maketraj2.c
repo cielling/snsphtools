@@ -58,15 +58,15 @@ int main(int argc, char *argv[])
     printf("argv[1]: %s has length %d\n", argv[1], len[1]);
 
     //myid = 1000;
-    INCR = 50;
+    INCR = 100;
     start = 0;
-    last = 500;
+    last = 8000;
 
     sdfname = (char *)malloc( (len[1]+5 ) * sizeof( char ) );
     outfile = (char *)malloc( (len[2]+8 ) * sizeof( char ) );
 
-    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50a1_sph.");
-    strcpy(outfile, "/scratch/cellinge/run3g_50.traj.");
+    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50AnB_sph.");
+    strcpy(outfile, "/scratch/cellinge/run3gAnB.traj.");
 
     printf("%s  %d  %d\n", sdfname, strlen(sdfname),len[1]);
     printf("%s  %d  %d\n", outfile, strlen(outfile),len[2]);

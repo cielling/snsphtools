@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
     fprintf(fp,"\n");
 
     for(i=0;i<Nbins;i++) {
-        fprintf(fp,"%10E ",radbin[i]*6.955e10);
+        fprintf(fp,"%10E ",radbin[i]);
         for(j=0;j<numA;j++) {
             fprintf(fp,"%10E ", (double)abundarr[i][j]);
         }

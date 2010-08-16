@@ -113,10 +113,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
         }
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "temp", strlen(vecs[i])) == 0) index[6]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[6]=i;
 /*
         if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
@@ -159,7 +159,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
             strides[i] = outstride;
         }
 
-    fprintf(fp,"%13s %13s %13s %13s %13s %13s %13s\n",
+    fprintf(fp,"%13s\t%13s\t%13s\t%13s\t%13s\t%13s\t%13s\t\n",
             members[0],
             members[1],
             members[2],
@@ -178,7 +178,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         SDFseekrdvecsarr(sdfp, num, members, starts, lines, addrs, strides);
 
-        fprintf(fp,"%+13E %+13E %+13E %+13E %+13E %+13E %+13E\n",
+        fprintf(fp,"%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t\n",
                 *((double *)(btab + inoffsets[0])),
                 *((double *)(btab + inoffsets[1])),
                 *((double *)(btab + inoffsets[2])),

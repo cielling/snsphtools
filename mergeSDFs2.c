@@ -1,17 +1,39 @@
 /*
+
    PURPOSE:
         to merge two SDF files into one file.
-        You can now enter the radius at which the two files should be
-        merged, or -99. to just paste the second file onto the first.
+
+   COMPILE:
+	with Makefile2. un-comment appropriate lines.
+	This routine needs some libraries from the tree code and SDF routines,
+	so make sure that TREEHOME is set, and the tree code (SNSPH) compiled
+	once for serial use (i.e. without PAROS flag).
+
+   RUN:
+	mergeSDFs2 <file-1.sdf> <file-2.sdf> <outfile.sdf>
+
+	You are then prompted for a radius at which the two files should be
+        merged, or enter -99.0 to just paste the second file onto the first.
+
+   METHOD:
+	The code first checks which of the two headers is shorter (has fewer
+	members) and writes the shorter one to <outfile.sdf> (I'm not sure
+	why I did it that way, but I assume I had a good reason. Maybe it's
+	because it is easier to skip extra data than to read data that is
+	not there).
+	The code reads in <file-1.sdf> line-by-line, and if a radius of -99.0
+	was entered writes the whole file to <oufile.sdf>, else it writes
+	all particles with radius less than entered radius to <outfile.sdf>.
+	Then <file-2.sdf> is read in ,line-by-line, and added to <outfile.sdf>.
+	The code assumes that all particles of <file-2.sdf> have a radius
+	greater than the merge radius, so all particles are added.
+	The particle ID's of <file-2.sdf> are updated by adding the largest
+	ID value from <file-1.sdf>.
+	The npart values in the header of <outfile.sdf> are also updated
+	to reflect the new total particle number.
 
    NOTE: the original files are not modified.
 
-   DONE: 1) get list of columns in both SDF files
-   DONE: 2) compare and exit if the headers are not the same
-   DONE: 2) read all scalars
-   DONE: 3) read all structure members
-   DONE: 5) loop over 3-4 until whole file is read (or seg fault is reached ;-P)
-   DONE: 6) write scalars and buffer to file
 */
 
 #include <stdio.h>
@@ -109,10 +131,13 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int npart)
     datum_t datum;
     fpos_t pos;
 
-    nvecs = SDFnvecs(sdfp);/*figure out number of lines in the header, basically-CE*/
-    vecs = SDFvecnames(sdfp);/*get the names of the variables/parameters in the header-CE*/
+    /*figure out number of lines in the header, basically-CE*/
+    nvecs = SDFnvecs(sdfp);
 
-/*go through all of them individually-CE*/
+    /*get the names of the variables/parameters in the header-CE*/
+    vecs = SDFvecnames(sdfp);
+
+    /*go through all of them individually-CE*/
     for (i = 0; i < nvecs; ++i) {
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
 	if (flag) continue;
@@ -124,10 +149,10 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int npart)
 	   don't think there's an equivalent for the SDFrdvecs family
 	   though, so "read; convert type; write" is the general
 	   path. */
-/*read in header file, line by line, with the appropriate function-CE*/
+
+        /*read in header file, line by line, with the appropriate function-CE*/
 	switch (type) {
 	case SDF_INT:
-/*SDFget*:sdfp=sdf file; vecs[i]= variable name; datum.*=holds value of that variable-CE*/
 	    SDFgetint(sdfp, vecs[i], &(datum.i));
 	    break;
 	case SDF_FLOAT:
@@ -141,7 +166,7 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int npart)
 /* 	    exit(-1); */
 	}
 
-/*write header file, line by line, as the appropriate data type-CE*/
+        /*write header file, line by line, as the appropriate data type-CE*/
 	switch (type) {
 	case SDF_INT:
             if( !strncmp(vecs[i], "npart", strlen(vecs[i])) ) {
@@ -182,12 +207,12 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     float radius, R0;
     int abarr1[2][22], abarr2[2][22];
     int abinfo1, abinfo2, first=1, abundflag=0,k;
-    /*make INCR and nlines user input */
 
-    /* Count structure members */
+    /* count number of data columns, i.e. struct members with more than one element */
+    /* this method assumes that "x" is the first data column */
     /* don't use SDFnrecs, since that reads in the entire file which I'm trying to
-       avoid. But I know that the structure (so far) always has "x" as the first
-       member, so I can start counting from there -CE */
+       avoid.
+     */
 
     nvecs1 = SDFnvecs(sdfp1);
     vecs1 = SDFvecnames(sdfp1);
@@ -213,6 +238,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	if (flag) ++nmembers2;
     }
 
+    /* prompt user for merger radius */
     printf("Enter merge radius or -99. : ");
     scanf("%f", &R0);
     printf(" %f\n", R0);
@@ -220,14 +246,12 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     SDFgetint(sdfp1, "npart", &npart1);
     SDFgetint(sdfp2, "npart", &npart2);
     printf("%d and %d particles\n", npart1, npart2);
-/* need to figure out how to update npart in the header, since in the future
-   that number will probably change from the inputfiles -CE */
 
     if( nmembers1 <= nmembers2) {
        maxmbrs = nmembers1;
     } else { maxmbrs = nmembers2;}
 
-/*malloc memory space for the respective features of the struct-CE*/
+    /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc(maxmbrs * sizeof(char *));
     addrs = (void **)malloc(maxmbrs * sizeof(void *));
     types = (SDF_type_t *)malloc(maxmbrs * sizeof(SDF_type_t));
@@ -238,11 +262,12 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
     printf("done malloc'ing\n");
 
-    /* find the file with the fewer members and write that to output */
+    /* find the file with the fewer members and write its header to output */
+    /* done by populating the output arrays from the appropriate file */
 
     flag = 0;
     if ( nmembers1 < nmembers2) {
-/*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
+    /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs1; ++i) {
 
             if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) flag=1;
@@ -250,8 +275,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
             if(flag) {
 	        members[nmembers] = vecs1[i];
 	        types[nmembers] = SDFtype(members[nmembers], sdfp1);
-	        inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
-                                            of data (struct member) */
+	        inoffsets[nmembers] = stride;
 	        stride += SDFtype_sizes[types[nmembers]];
                 lines[nmembers] = incr;
                 nmembers++;
@@ -266,7 +290,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
             strides[i] = stride;
 
     } else {
-/*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
+    /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs2; ++i) {
 
             if (strncmp(vecs2[i], "x", strlen(vecs2[i])) == 0) flag=1;
@@ -274,8 +298,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
             if(flag) {
 	        members[nmembers] = vecs2[i];
 	        types[nmembers] = SDFtype(members[nmembers], sdfp2);
-	        inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
-                                            of data (struct member) */
+	        inoffsets[nmembers] = stride;
 	        stride += SDFtype_sizes[types[nmembers]];
                 lines[nmembers] = incr;
                 nmembers++;
@@ -297,9 +320,15 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
     printf("outstride = %d\n", outstride);
 
+    /* holds the read in data */
     btab = (void *)malloc( stride*incr );
 
+
     printf("printing header\n");
+
+    /* writes the new header from the appropriate file. Assumes that both files
+     * are merged in their entirety. Returns the location in memory where the
+     * total particle number is stored so it can be updated later */
 
     if (nmembers1 < nmembers2) {
         writescalars(sdfp2, fp, &pos_npart,npart1+npart2);
@@ -325,9 +354,9 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	    exit(-1);
 	}
     }
+    /* again, assume that all of both files is merged. Save this memory location also */
     fgetpos(fp, &pos1_npart);
-    fprintf(fp, "}[%d];\n", npart1+npart2); /*figure out how to save the location of the file position
-                                       indicator, so we can come back and update npart -CE */
+    fprintf(fp, "}[%d];\n", npart1+npart2);
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
 
@@ -336,7 +365,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     for (i=1; i< maxmbrs; i++)
          addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
 
-/*loop over each file consecutively in chunks of data, write that chunk to file*/
+    /*loop over each file consecutively in chunks of data, write that chunk to file*/
     printf("getting file 1 .... ");
     for( i=0, countnpart = 0; i < npart1; i++) {
         /* need to increment starts-array */
@@ -348,6 +377,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
         ident = *((int *)(btab + inoffsets[idindex]));
 
+        /* calculate radius for merging */
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
@@ -364,12 +394,14 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	/*dump the btab data into the file now-CE*/
         if( (radius < R0 ) ) {
 	    fwrite(btab, outstride, 1, fp);
+            /* count number of particles actually writted */
             countnpart++;
             if(ident > identmax)
                identmax = ident;
         }
         else if( R0 < 0.0 ) {
             fwrite(btab, outstride, 1, fp);
+            /* count number of particles actually writted */
             countnpart++;
             if(ident > identmax)
                identmax = ident;
@@ -400,6 +432,9 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
 
+        /* check if the abundance information is the same in both files, and spit
+         * out a warning if it is not */
+        /* Note: doesn't seem to be working yet */
         if(first) {
             for(k=0;k<22;k++){
                 abarr2[0][k] = *((int *)(btab + inoffsets[abinfo2+k]));/*Z*/
@@ -418,6 +453,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	/*dump the btab data into the file now-CE*/
         if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
 	    fwrite(btab, outstride, 1, fp);
+            /* count number of particles actually writted */
             countnpart++;
         }
 
