@@ -63,6 +63,8 @@ int main(int argc, char *argv[])
     SDF *sdfp = NULL;
     FILE *fp = NULL;
 
+    printf("sizeof(long)= %d\n",sizeof(long));
+
     initargs(argc, argv, &sdfp, &fp);
 
     writeinit(fp);
