@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     printf("increment and number of last file: ");
     /*scanf("%d %d", &INCR, &nfile);*/
     INCR = 100;
-    nfile = 3500;
+    nfile = 3700;
     start = 0;
     printf("%d %d\n", INCR, nfile);
 

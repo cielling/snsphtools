@@ -6,8 +6,8 @@ LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
 LDLIBS = -lsw
 
 #PROGS = todoublepos
-#PROGS= readsection2
-PROGS= addabundance2
+PROGS= readsection2
+#PROGS= addabundance2
 #PROGS = mergeSDFs2
 #PROGS = maketraj2
 #PROGS = addvel
@@ -17,8 +17,8 @@ PROGS= addabundance2
 all: $(PROGS)
 
 #todoublepos: todoublepos.o
-#readsection2: readsection2.o
-addabundance2: addabundance2.o
+readsection2: readsection2.o
+#addabundance2: addabundance2.o
 #mergeSDFs2: mergeSDFs2.o
 #maketraj2: maketraj2.o
 #addvel: addvel.o

@@ -1,20 +1,32 @@
 /*
+
    PURPOSE:
 	to read in large SDF files (10 M particles or more, even though it should
-	work for any size (if the output fits into memory)) and shrink them by
-	just writing every INCR line and fewer columns (just x,y,z,h,mass) to file.
+	work for any size ) and shrink them by
+	just writing every INCR line and fewer columns (just x,y,z,h,mass,rho) to file.
 	This routine reads in the whole file, line-by-line (or rather, INCR lines
 	at a time since I couldn't get the single line-by-line to work yet), and
 	writes the first of each set of lines (i.e. every INCR line) to file.
-   NOTE: this code assumes that you can look into the SDf header file, and determine
-	the number of particles and the presence of the columns you want to read in.
 
-   DONE: 1) get list of names in SDF file
-   DONE: 2) read all scalars
-   DONE: 3) read selected structure members, INCR lines at a time
-   DONE: 4) calculate offsets, write adjusted members into buffer
-   DONE: 5) loop over 3-4 until whole file is read (or seg fault is reached ;-P)
-   DONE: 6) write scalars and buffer to file
+   COMPILE:
+	with Makefile2. un-comment appropriate lines.
+	This routine needs some libraries from the tree code and SDF routines,
+	so make sure that TREEHOME is set, and the tree code (SNSPH) compiled
+	once for serial use (i.e. without PAROS flag).
+
+   SYNTAX:
+	readsection2 <large-file.sdf> <outfile.sdf>
+
+   METHOD:
+	@ open <large-file.sdf>
+	@ determine which columns to read in (currently x, y, z, h, mass, rho)
+	@ read in INCR lines of just those columns with SDFseekreadvecs.
+	@ write the first line of the read in data block to <outfile.sdf>
+
+   NOTE:
+	assumes that npart from the header contains the actual number of particles
+	also, in the past the free'ing of allocated arrays has caused segfaults
+
 */
 
 #include <stdio.h>
@@ -168,11 +180,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
     char **vecs, **members;
     SDF_type_t *types;
     size_t stride = 0, outstride = 0;
-    void *btab, *outbtab;
+    void *btab;
     void **addrs;
     int *inoffsets;
-    int INCR=50, flag=0, num=5;
-    int nlines=48582750;
+    int INCR=50, flag=0, num=6;
+    int nlines;
     int index[num];
     /*make INCR and nlines user input */
 
@@ -195,6 +207,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
         if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[5]=i;
 	if (flag) ++nmembers;
     }
     printf("nmembers = %d\n",nmembers);
@@ -221,7 +234,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     /*btab = (void *)malloc(nlines * outstride);*/
     btab = (void *)malloc(INCR * outstride);
-    outbtab = (void *)malloc( nlines/INCR * outstride );
 
     /*calculate the byte offset in memory to the address of the next member-CE*/
 	addrs[0] = (char *)btab;
@@ -229,8 +241,20 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     printf("reading in %d lines ...\n",nlines);
 
+    /*print the struct declaration part from the header-CE*/
+    fprintf(fp, "struct {\n");
+    fprintf(fp, "\tdouble x;\n");
+    fprintf(fp, "\tdouble y;\n");
+    fprintf(fp, "\tdouble z;\n");
+    fprintf(fp, "\tfloat mass;\n");
+    fprintf(fp, "\tfloat h;\n");
+    fprintf(fp, "\tfloat rho;\n");
+    fprintf(fp, "}[%d];\n", nlines/INCR);
+    fprintf(fp, "#\n");
+    fprintf(fp, "# SDF-EOH\n");
+
     /*try reading in one line at a time */
-    for(j=0;j<nlines;j=j+INCR) {
+    for(j = 0; j < nlines; j = j+INCR) {
         SDFseekrdvecs(sdfp,
 
     /*name, start, n, addr(as in: address in memory where to read the data to?), stride,*/
@@ -242,36 +266,17 @@ static void writestructs(SDF *sdfp, FILE *fp)
                "h",j,INCR,addrs[4],outstride,
                NULL);
 
-        if(!(j%INCR)) {
-            for (i=0; i<num; i++) {
-                /* im in ur memory, shufflin around ur data */
-                memcpy(outbtab + j/INCR * outstride + inoffsets[i],
-                       btab+inoffsets[i], SDFtype_sizes[ types[i] ]);
-            }
-        }
+        /*dump the outbtab data into the file now-CE*/
+        fwrite(btab, outstride, 1, fp);
+
     }
-
-/*print the struct declaration part from the header-CE*/
-    fprintf(fp, "struct {\n");
-    fprintf(fp, "\tdouble x;\n");
-    fprintf(fp, "\tdouble y;\n");
-    fprintf(fp, "\tdouble z;\n");
-    fprintf(fp, "\tfloat mass;\n");
-    fprintf(fp, "\tfloat h;\n");
-    fprintf(fp, "}[%d];\n", nlines/INCR);
-    fprintf(fp, "#\n");
-    fprintf(fp, "# SDF-EOH\n");
-
-/*dump the outbtab data into the file now-CE*/
-    fwrite(outbtab, outstride, nlines/INCR, fp);
 
 
 /*and we're done! clean up now -CE: if it ever works*/
-/*    free(members);
+    free(members);
     free(btab);
     free(addrs);
     free(types);
     free(inoffsets);
-*/
-    /*free(outbtab);*/
+
 }
