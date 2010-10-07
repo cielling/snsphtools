@@ -168,7 +168,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
     size_t stride = 0;
     void *btab;
     void **addrs;
-    double alpha, beta;
+    double alpha, beta, vfactor;
+    float set_radius;
     double x, y, z, radius;
     float vx, vy, vz, vx2, vy2, vz2;
 
@@ -177,6 +178,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     alpha = sqrt(1./7.);
     beta = sqrt(9./7.);
+    /*set_radius = 0.14;*/
+    printf("enter set_radius: ");
+    scanf("%f",&set_radius);
+    printf("%f\n",set_radius);
+
+    vfactor = 1.00;
 
     SDFgetint(sdfp, "npart", &nrecs);
     fprintf(frp,"%d particles\n", nrecs);
@@ -278,16 +285,15 @@ static void writestructs(SDF *sdfp, FILE *fp)
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
         /* if((vx*x+vy*y+vz*z)/radius > 0.0) { makes it one "jet" only*/
-        if(radius < 2.73e-3) {
+        if(radius < set_radius) {
             vx2 = (alpha + beta * fabs(z) /radius) * vx;
             vy2 = (alpha + beta * fabs(z) /radius) * vy;
             vz2 = (alpha + beta * fabs(z) /radius) * vz;
-        }/* else {
-            vx2 = vx * 0.9;
-            vy2 = vy * 0.9;
-            vz2 = vz * 0.9;
+        } else {
+            vx2 = vx * vfactor;
+            vy2 = vy * vfactor;
+            vz2 = vz * vfactor;
         }
-*/
 
         memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
         memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);

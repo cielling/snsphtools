@@ -32,7 +32,7 @@ typedef union {
 } datum_t;
 
 double ***trajec;
-int maxID = 200000, idstep=10000;
+int maxID = 15000, idstep=15;
 
 static void writestructs(SDF *sdfp, FILE *fp, int row);
 
@@ -58,15 +58,15 @@ int main(int argc, char *argv[])
     printf("argv[1]: %s has length %d\n", argv[1], len[1]);
 
     //myid = 1000;
-    INCR = 100;
+    INCR = 20;
     start = 0;
-    last = 8000;
+    last = 2000;
 
     sdfname = (char *)malloc( (len[1]+5 ) * sizeof( char ) );
     outfile = (char *)malloc( (len[2]+8 ) * sizeof( char ) );
 
-    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50AnB_sph.");
-    strcpy(outfile, "/scratch/cellinge/run3gAnB.traj.");
+    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50Am6_sph.");
+    strcpy(outfile, "/scratch/cellinge/run3g_Am6.traj.");
 
     printf("%s  %d  %d\n", sdfname, strlen(sdfname),len[1]);
     printf("%s  %d  %d\n", outfile, strlen(outfile),len[2]);
@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
                 "temp",
                 "time"
                );
+
         for( i = 0; i < nrows; i++) {
             printf("printing file %4d row %4d\n",j,i);
             fprintf(fp, "%+13E %+13E %+13E %+13E %+13E %+13E\n",

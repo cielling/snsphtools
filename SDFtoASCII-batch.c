@@ -64,12 +64,12 @@ int main(int argc, char *argv[])
     }
 */
 
-    strcpy(outname, "/scratch/cellinge/run3g_jet5b.dat.");
-    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50Am_jet5b_sph.");
+    strcpy(outname, "/scratch/cellinge/run3g_jet5c.dat.");
+    strcpy(sdfname, "/scratch/cellinge/runsnsph/run3g_50Am_jet5c_sph.");
 
     printf("increment and number of last file: ");
     /*scanf("%d %d", &INCR, &nfile);*/
-    INCR = 100;
+    INCR = 200;
     nfile = 3700;
     start = 0;
     printf("%d %d\n", INCR, nfile);

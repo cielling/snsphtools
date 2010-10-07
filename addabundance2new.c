@@ -7,6 +7,8 @@
 	original neutron-proton ratio.
         This version should also work for large files, since it reads in the
         sdf file line-by-line.
+	New: this version writes the new abundance format, with the Z,N of the
+	tracked isotopes in the header of the SDF file.
 
    COMPILE:
 	with Makefile2. un-comment appropriate lines.
@@ -15,7 +17,7 @@
 	once for serial use (i.e. without PAROS flag).
 
    RUN:
-	addabundance2 <in-file.sdf> <out-file.sdf>
+	addabundance2new <in-file.sdf> <out-file.sdf>
 
    METHOD:
 	@ read in <in-file.sdf> line-by-line (particle-by-particle)
@@ -51,19 +53,20 @@ static void writeinit(FILE *fp);
 static void writescalars(SDF *sdfp, FILE *fp);
 static void writestructs(SDF *sdfp, FILE *fp);
 
-static const int NISO = 22;
-static const int NNW = 20;
+int NNW;
+int NISO;
 
-void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
+/*void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);*/
+void renorm(int **want, float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
 
 double get_ye(float abundarr[], int nparr[], int nnarr[], int Niso);
+
+int make_spec_names(char *** chararr, char spec, int num);
 
 int main(int argc, char *argv[])
 {
     SDF *sdfp = NULL;
     FILE *fp = NULL;
-
-    printf("sizeof(long)= %d\n",sizeof(long));
 
     initargs(argc, argv, &sdfp, &fp);
 
@@ -178,24 +181,26 @@ static void writestructs(SDF *sdfp, FILE *fp)
 {
     FILE *fap = NULL, *frp = NULL;
     int i, j, k, nvecs, nmembers, Amembers, ju, jm, jl;
-    int numA, Nbins, len, counter, flag = 0;
-    int nrecs;
+    int numA, Nbins, counter, flag = 0;
+    int nrecs = 0;
     int *strides, *nobjs, *starts, *inoffsets, *outoffsets, *nparr, *nnarr;
-    int want[2][NISO]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,22,24,26,26,26,27,28},/*Z*/
-                       {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,26,24,26,28,30,29,28}}; /*A-Z*/
-    int inNW[2][NNW]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,24,26,26,27,28},/*Z*/
-                       {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,24,26,30,29,28}}; /*A-Z*/
+    int **nwlist;
+    //int want[2][NISO]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,22,24,26,26,26,27,28},/*Z*/
+    //                   {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,26,24,26,28,30,29,28}}; /*A-Z*/
+    //int inNW[2][NNW]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,24,26,26,27,28},/*Z*/
+    //                   {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,24,26,30,29,28}}; /*A-Z*/
+    char tmpchr[40];
     char **vecs, **members, **outmembers;
-    char mychar[5];
+    char **fnames, **pnames, **nnames;
     SDF_type_t *types, *outtypes;
     size_t stride = 0, outstride = 0;
     void *btab, *outbtab;
     void **addrs;
     float **abundarr; /*should this be void * ? */
     float *newabund;
-    double x, y, z, radius;
     float *radbin;
     float tmpval1, tmpval2;
+    double x, y, z, radius;
 
     frp = fopen("log.out","w");
     if(!frp) printf("error opening log file!\n");
@@ -215,18 +220,39 @@ static void writestructs(SDF *sdfp, FILE *fp)
     }
     printf("nmembers = %d\n",nmembers);
 
-    Amembers = 3*NISO;
+    /* read in the list of isotopes in the network */
+    fap = fopen("network.isotopes", "r");
+    if (!fap) printf("error opening files network.isotopes\n");
+
+    fscanf(fap, "%d", &NNW);
+    fscanf(fap, "%s\t%s", tmpchr,tmpchr);
+
+    /* this way nwlist is indexed the same way as want */
+    nwlist = (int **) malloc ( 2 * sizeof(int *) );
+    nwlist[0] = (int *) malloc ( NNW * sizeof(int) );
+    nwlist[1] = (int *) malloc ( NNW * sizeof(int) );
+
+    for( i = 0; i < NNW; i++) {
+        fscanf(fap, "%d", &nwlist[0][i]);
+        fscanf(fap, "%d", &nwlist[1][i]);
+    }
+
+    fclose(fap);
+    fap = NULL;
+
+    NISO = NNW;
+    Amembers = 1*NISO;
 
     /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc(nmembers * sizeof(char *));
-    outmembers = (char **)malloc(3 * NISO * sizeof(char *));
-    for(j=0;j<3*NISO;j++) outmembers[j] = (char *)malloc(10 * sizeof(char));
+    outmembers = (char **)malloc(1 * NISO * sizeof(char *));
+    for(j=0;j<1*NISO;j++) outmembers[j] = (char *)malloc(10 * sizeof(char));
     addrs = (void **)malloc(nmembers * sizeof(void *));
     strides = (int *)malloc(nmembers * sizeof(int));
     nobjs = (int *)malloc(nmembers * sizeof(int));
     starts = (int *)malloc(nmembers * sizeof(int));
     types = (SDF_type_t *)malloc(nmembers * sizeof(SDF_type_t));
-    outtypes = (SDF_type_t *)malloc(3 * NISO * sizeof(SDF_type_t));
+    outtypes = (SDF_type_t *)malloc(1 * NISO * sizeof(SDF_type_t));
     inoffsets = (int *)malloc(nmembers * sizeof(int));
     outoffsets = (int *)malloc(Amembers * sizeof(int));
 
@@ -234,31 +260,31 @@ static void writestructs(SDF *sdfp, FILE *fp)
     flag = 0;
     for (i = 0, nmembers = 0, stride = 0; i < nvecs; ++i) {
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
-	if (flag) {
-	    members[nmembers] = vecs[i];
-	    nobjs[nmembers] = 1;/*nobjs[0] is the number of particles. are all elements
+	    if (flag) {
+	        members[nmembers] = vecs[i];
+	        nobjs[nmembers] = 1;/*nobjs[0] is the number of particles. are all elements
                                       in this nobjs array the same then??-CE:yes, but can be
                                       different*/
-				/* this is also the number of lines that are read in at a time */
-	    starts[nmembers] = 0;  /* Not correct in parallel; use
+			/* this is also the number of lines that are read in at a time */
+	        starts[nmembers] = 0;  /* Not correct in parallel; use
 				      NobjInitial */
-	    types[nmembers] = SDFtype(members[nmembers], sdfp);
-	    inoffsets[nmembers] = stride;
-	    stride += SDFtype_sizes[types[nmembers]];
+	        types[nmembers] = SDFtype(members[nmembers], sdfp);
+	        inoffsets[nmembers] = stride;
+	        stride += SDFtype_sizes[types[nmembers]];
 
-	    ++nmembers;
-	}
+	        ++nmembers;
+	    }
     }
 
     btab = (void *)malloc(stride);
 
-    /*calculate the byte offset in memory to the address of the next member-CE*/
+    /*calculate the byte offset in memory to the address of the next member-CIE*/
     for (i = 0; i < nmembers; ++i) {
 	addrs[i] = (char *)btab + inoffsets[i];
 	strides[i] = stride;
     }
 
-/* up to here just the SDF file is read in, so everything stays the same -CE */
+/* up to here just the SDF file is read in, so everything stays the same -CIE */
 
     /* create the extra columns for abundances 'n stuff */
     /* right now this is just generic names, f## for massfraction,
@@ -266,11 +292,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     /* it shouldn't be too hard to name the mass fraction by isotope
        however, than the SDFread/-write section in the SPH code need
        to be modified also */
+/*
     for (i=0; i < NISO; i++) {
         len = sprintf(mychar, "%s%-d", "f",(i+1));
-/*
+*//*
 	len = sprintf(mychar, "%s%-d",isotope, (nparr[i]+nnarr[i]));
-*/
+*//*
         for(j=0;j<5;j++) outmembers[i][j]=mychar[j];
         outtypes[ i ] = SDF_FLOAT;
 
@@ -282,18 +309,30 @@ static void writestructs(SDF *sdfp, FILE *fp)
         for(j=0;j<5;j++) outmembers[i+NISO*2][j]=mychar[j];
         outtypes[ i+NISO*2 ] = SDF_INT;
     }
+*/
+
+/*
+    fnames = make_spec_names('f', NISO);
+    pnames = make_spec_names('p', NISO);
+    nnames = make_spec_names('n', NISO);
+*/
+    make_spec_names(&fnames, 'f', NISO);
+    make_spec_names(&pnames, 'p', NISO);
+    make_spec_names(&nnames, 'n', NISO);
 
     outstride = stride;
 
     /*calculate at what byte-intervals the data should be written-CE*/
     /* adding enough columns for the abundances */
     for (i = 0; i < Amembers; ++i) {
-	outoffsets[i] = outstride;
-	outstride += SDFtype_sizes[ outtypes[ i ] ];
+        sprintf(outmembers[i],"%s",fnames[i]);
+        outtypes[i] = SDF_FLOAT;
+	    outoffsets[i] = outstride;
+	    outstride += SDFtype_sizes[ outtypes[ i ] ];
     }
 
     /*malloc enough space in memory for the array that holds the whole output data-CE*/
-    printf("about to malloc %u bytes for outbtab\n", outstride);
+    printf("about to malloc %d bytes for outbtab\n", (int)outstride);
     outbtab = (void *)malloc( outstride );
 
     /* now need to read in the abundances, and other necessary stuff */
@@ -371,6 +410,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fclose(fap);
     fap = NULL;
 
+    /* print Z and N of isotopes of choice */
+    for( i = 0; i < NISO; i++ ) {
+        fprintf(fp, "int %s = %d;\n", pnames[i], nwlist[0][i]);
+        fprintf(fp, "int %s = %d;\n", nnames[i], nwlist[1][i]);
+    }
+
     /*print the struct declaration part from the header-CE*/
     fprintf(fp, "struct {\n");
     for (i = 0; i < nmembers; ++i) {
@@ -447,13 +492,13 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	}
 
         /* renormalize abundances first */
-        renorm(inNW, newabund, abundarr[jl], nparr, nnarr, numA, NNW, frp);
+        renorm(nwlist, newabund, abundarr[jl], nparr, nnarr, numA, NNW, frp);
 
         /* now populate outbtab with abundances 'n stuff */
         for (i = 0, counter = 0; i < numA; i++) {
-            for (k = 0; k < NISO; k++) {
-                if ( (nparr[i] == inNW[0][k]) &&
-                     (nnarr[i] == inNW[1][k]) ) {
+            for (k = 0; k < NNW; k++) {
+                if ( (nparr[i] == nwlist[0][k]) &&
+                     (nnarr[i] == nwlist[1][k]) ) {
 
                      /* fill in abundances */
                     memcpy(outbtab + outoffsets[ k ],
@@ -461,12 +506,16 @@ static void writestructs(SDF *sdfp, FILE *fp)
                        /*&abundarr[jl][i] , SDFtype_sizes[ outtypes[ k ] ]);*/
 
                     /* fill in nprotons in isotope */
+/*
                      memcpy(outbtab + outoffsets[ k+NISO ],
                        &nparr[i] , SDFtype_sizes[ outtypes[ k+NISO ] ]);
+*/
 
                     /* fill in nneutrons in isotope */
+/*
                     memcpy(outbtab + outoffsets[ k+NISO*2 ],
                        &nnarr[i] , SDFtype_sizes[ outtypes[ k+NISO*2 ] ]);
+*/
 
                     counter++;
                 }
@@ -480,6 +529,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
     printf("wrote %d abundances to outbtab\n", counter);
 
     /*and we're done! clean up now -CE*/
+    free(pnames);
+    free(nnames);
+    free(fnames);
     free(members);
     free(addrs);
     free(strides);
@@ -505,7 +557,9 @@ double get_ye(float abundarr[], int nparr[], int nnarr[], int Niso) {
 }
 
 
-void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnw, FILE *frp) {
+/*void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnw, FILE *frp) */
+void renorm(int **want, float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnw, FILE *frp)
+{
     int i, j, is_in_arr, adjust;
     int jl, jm, ju, fe56, count;
     double Ye_old, Ye_new, sum, factor, factor1, eps=1.e-4;
@@ -617,4 +671,23 @@ void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], in
     if(fabs(sum - 1.0) > 1.e-3)
        fprintf(frp, "renorm warning: mass fractions don't sum to 1: %E\n",sum);
 
+}
+
+
+int make_spec_names(char ***chararr, char spec, int num)
+{
+    int i;
+    char tmpchr[20];
+
+    *chararr = (char **)malloc(num * sizeof(char *) );
+
+    for( i = 0; i < num; i++ ){
+
+        sprintf( tmpchr, "%c%-d\0", spec, (i+1));
+        (*chararr)[i] = (char *)malloc( ( strlen(tmpchr) + 1) * sizeof(char) );
+        sprintf( (*chararr)[i], "%s",tmpchr );
+        //printf("isotope specifier: %s  %d\n", specarr[i],strlen(specarr[i]));
+
+    }
+    return i;
 }

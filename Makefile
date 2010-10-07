@@ -9,9 +9,10 @@ LDLIBS = -lsw
 #PROGS= readsection
 #PROGS= addabundance
 #PROGS= mergeSDFs
-PROGS= SDFtoASCII-batch
+#PROGS= SDFtoASCII-batch
 #PROGS= SDFtoASCII
 #PROGS= maketraj
+PROGS= readanSDF
 
 .PHONY: all clean
 
@@ -21,9 +22,10 @@ all: $(PROGS)
 #readsection: readsection.o
 #addabundance: addabundance.o
 #mergeSDFs: mergeSDFs.o
-SDFtoASCII-batch: SDFtoASCII-batch.o
+#SDFtoASCII-batch: SDFtoASCII-batch.o
 #SDFtoASCII: SDFtoASCII.o
 #maketraj: maketraj.o
+readanSDF: readanSDF.o
 
 clean:
 	-$(RM) $(PROGS) *.o *~

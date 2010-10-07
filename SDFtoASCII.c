@@ -92,6 +92,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int INCR=1, flag=0, num=7;
     int nlines = 1, nrecs;
     int index[num];
+    double x, y, z;
     /*make INCR and nlines user input */
 
 /* this does not attempt to load the whole file into memory, does it? -CE */
@@ -113,7 +114,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         }
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[4]=i;
         if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[5]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[6]=i;
@@ -178,6 +179,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         SDFseekrdvecsarr(sdfp, num, members, starts, lines, addrs, strides);
 
+        /* calculate radius for merging */
+        x = *((double *)(btab + inoffsets[0]));
+        y = *((double *)(btab + inoffsets[1]));
+        z = *((double *)(btab + inoffsets[2]));
+
+        /*if((x >= 0.0) && (y >= 0.0) && (z >= 0.0)) {*/
         fprintf(fp,"%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t\n",
                 *((double *)(btab + inoffsets[0])),
                 *((double *)(btab + inoffsets[1])),
@@ -187,9 +194,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
                 *((float *)(btab + inoffsets[5])),
                 *((float *)(btab + inoffsets[6]))
                );
-
+        }
+/*
     }
-
+*/
 
 /*and we're done! clean up now -CE: if it ever works*/
 /*    free(members);

@@ -183,10 +183,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *btab;
     void **addrs;
     int *inoffsets;
-    int INCR=50, flag=0, num=6;
+    int INCR=25, flag=0, num=6;
     int nlines;
     int index[num];
     /*make INCR and nlines user input */
+
+    SDFgetint(sdfp, "npart", &nlines);
 
 /* this does not attempt to load the whole file into memory, does it? -CE */
     nvecs = SDFnvecs(sdfp);
@@ -203,11 +205,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
             index[0]=i;
             flag=1;
         }
+        /* these seem to have to be in the order they are in the structure ? */
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "vy", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "vz", strlen(vecs[i])) == 0) index[5]=i;
 	if (flag) ++nmembers;
     }
     printf("nmembers = %d\n",nmembers);
@@ -246,9 +249,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fprintf(fp, "\tdouble x;\n");
     fprintf(fp, "\tdouble y;\n");
     fprintf(fp, "\tdouble z;\n");
-    fprintf(fp, "\tfloat mass;\n");
-    fprintf(fp, "\tfloat h;\n");
-    fprintf(fp, "\tfloat rho;\n");
+    fprintf(fp, "\tfloat vx;\n");
+    fprintf(fp, "\tfloat vy;\n");
+    fprintf(fp, "\tfloat vz;\n");
     fprintf(fp, "}[%d];\n", nlines/INCR);
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
@@ -262,8 +265,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
                "x",j,INCR,addrs[0],outstride,
                "y",j,INCR,addrs[1],outstride,
                "z",j,INCR,addrs[2],outstride,
-               "mass",j,INCR,addrs[3],outstride,
-               "h",j,INCR,addrs[4],outstride,
+               "vx",j,INCR,addrs[3],outstride,
+               "vy",j,INCR,addrs[4],outstride,
+               "vz",j, INCR,addrs[5],outstride,
                NULL);
 
         /*dump the outbtab data into the file now-CE*/
