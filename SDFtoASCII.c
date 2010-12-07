@@ -82,9 +82,9 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 /*this writes the actual data*/
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    int i, j, nvecs, nmembers;
+    int i, j, k, nvecs, nmembers;
     char **vecs, **members;
-    SDF_type_t *types;
+    SDF_type_t *types, type;
     size_t stride = 0, outstride = 0;
     void *outbtab, *btab;
     void **addrs;
@@ -114,9 +114,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
         }
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f14", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[5]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[6]=i;
 /*
         if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
@@ -160,15 +160,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
             strides[i] = outstride;
         }
 
-    fprintf(fp,"%13s\t%13s\t%13s\t%13s\t%13s\t%13s\t%13s\t\n",
-            members[0],
-            members[1],
-            members[2],
-            members[3],
-            members[4],
-            members[5],
-            members[6]
-           );
+    for( k = 0; k < num; k++) {
+        fprintf(fp,"%13s\t", members[k]);
+    }
+    fprintf(fp,"\n");
 
     printf("reading in %d lines ...\n",nrecs);
 
@@ -184,20 +179,30 @@ static void writestructs(SDF *sdfp, FILE *fp)
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
 
-        /*if((x >= 0.0) && (y >= 0.0) && (z >= 0.0)) {*/
-        fprintf(fp,"%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t%+13E\t\n",
-                *((double *)(btab + inoffsets[0])),
-                *((double *)(btab + inoffsets[1])),
-                *((double *)(btab + inoffsets[2])),
-                *((float *)(btab + inoffsets[3])),
-                *((float *)(btab + inoffsets[4])),
-                *((float *)(btab + inoffsets[5])),
-                *((float *)(btab + inoffsets[6]))
-               );
-        }
 /*
-    }
+        if((x >= 0.0) && (y >= 0.0) && (z >= 0.0)) {
 */
+        for( k = 0; k < num; k++) {
+            type = SDFtype(members[k], sdfp);
+            switch(type) {
+            case SDF_FLOAT:
+                fprintf(fp, "%+13E\t", *(float *)(btab + inoffsets[k]));
+                break;
+            case SDF_DOUBLE:
+                fprintf(fp, "%+13E\t", *(double *)(btab + inoffsets[k]));
+                break;
+            default:
+                printf("no such type: %s\n", type);
+                exit(1);
+            }
+        }
+        fprintf(fp,"\n");
+/*
+        }
+*/
+
+    }
+
 
 /*and we're done! clean up now -CE: if it ever works*/
 /*    free(members);

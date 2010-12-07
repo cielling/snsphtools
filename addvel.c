@@ -1,15 +1,29 @@
 /*
    PURPOSE:
-	to add an abundance table to an initial conditions sdf file.
+	to add a velocity asymmetry to an sdf file
         This version should also work for large files, since it reads in the
         sdf file line-by-line.
 
-   DONE: 1) get list of columns in SDF file
-   DONE: 2) read all scalars
-   DONE: 3) read all structure members
-   DONE: 4) read in abundances and radial bins
-   DONE: 5) find correct radial bin
-   DONE: 6) write scalars, sdf data and abundances to file
+   COMPILE:
+    with Makefile2. un-comment appropriate lines.
+    This routine needs some libraries from the tree code and SDF routines,
+    so make sure that TREEHOME is set, and the tree code (SNSPH) compiled
+    once for serial use (i.e. without PAROS flag).
+
+   RUN:
+    addvel <in-file.sdf> <out-file.sdf>
+
+   METHOD:
+	@ read in header of <in-file.sdf>
+	@ prompt user for the shock radius (or below where-ever the velocity
+	  asymmetry is to be added
+	@ read in data line-by-line
+	@ calculate radius for each particle
+	@ determine if particle is in/inside of the shock (by simple comparison
+      to the input radius)
+	@ if yes, modify velocity according to prescription
+	@ write data to <out-file.sdf>
+
 */
 
 #include <stdio.h>
@@ -176,10 +190,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
 
-    alpha = sqrt(1./7.);
-    beta = sqrt(9./7.);
+    alpha = sqrt(1./9.);
+    beta = sqrt(7./9.);
     /*set_radius = 0.14;*/
-    printf("enter set_radius: ");
+/*
+*/
+    printf("set_radius: enter 0 if set by vr:");
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
 
@@ -284,8 +300,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        /* if((vx*x+vy*y+vz*z)/radius > 0.0) { makes it one "jet" only*/
+        if( (fabs((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
+            || (radius < set_radius)) {
+/*
         if(radius < set_radius) {
+*/
             vx2 = (alpha + beta * fabs(z) /radius) * vx;
             vy2 = (alpha + beta * fabs(z) /radius) * vy;
             vz2 = (alpha + beta * fabs(z) /radius) * vz;

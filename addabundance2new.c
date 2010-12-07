@@ -5,10 +5,15 @@
 	it is assumed that fewer isotopes are added than are in the abundance
 	files, so the added abundances are renormalized to preserve the
 	original neutron-proton ratio.
+    The neutron excess is stuffed into 56Fe, and the rest of the abundances
+    is adjusted accordingly so they still sum to one.
         This version should also work for large files, since it reads in the
         sdf file line-by-line.
 	New: this version writes the new abundance format, with the Z,N of the
-	tracked isotopes in the header of the SDF file.
+	tracked isotopes in the header of the SDF file. It also expects to find
+    a file "network.isotopes" with the Z,N numbers of the isotopes in the
+    network in tabular form, and the first line containing the number of
+    isotopes.
 
    COMPILE:
 	with Makefile2. un-comment appropriate lines.
@@ -185,10 +190,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int nrecs = 0;
     int *strides, *nobjs, *starts, *inoffsets, *outoffsets, *nparr, *nnarr;
     int **nwlist;
-    //int want[2][NISO]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,22,24,26,26,26,27,28},/*Z*/
-    //                   {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,26,24,26,28,30,29,28}}; /*A-Z*/
-    //int inNW[2][NNW]={{0,1,2,6,8,10,12,14,15,16,18,20,20,21,22,24,26,26,27,28},/*Z*/
-    //                   {1,0,2,6,8,10,12,14,16,16,18,20,24,23,22,24,26,30,29,28}}; /*A-Z*/
     char tmpchr[40];
     char **vecs, **members, **outmembers;
     char **fnames, **pnames, **nnames;
@@ -216,7 +217,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
        since that read in the whole file, which we're trying to avoid */
     for (i = 0, nmembers = 0; i < nvecs; ++i) {
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
-	if (flag) ++nmembers;
+		if (flag) ++nmembers;
     }
     printf("nmembers = %d\n",nmembers);
 
@@ -285,31 +286,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
     }
 
 /* up to here just the SDF file is read in, so everything stays the same -CIE */
-
-    /* create the extra columns for abundances 'n stuff */
-    /* right now this is just generic names, f## for massfraction,
-       p##, n## for proton, neutron number of the isotope */
-    /* it shouldn't be too hard to name the mass fraction by isotope
-       however, than the SDFread/-write section in the SPH code need
-       to be modified also */
-/*
-    for (i=0; i < NISO; i++) {
-        len = sprintf(mychar, "%s%-d", "f",(i+1));
-*//*
-	len = sprintf(mychar, "%s%-d",isotope, (nparr[i]+nnarr[i]));
-*//*
-        for(j=0;j<5;j++) outmembers[i][j]=mychar[j];
-        outtypes[ i ] = SDF_FLOAT;
-
-        len = sprintf(mychar, "%s%-d", "p",(i+1));
-        for(j=0;j<5;j++) outmembers[i+NISO][j]=mychar[j];
-        outtypes[ i+NISO ] = SDF_INT;
-
-        len = sprintf(mychar, "%s%-d", "m",(i+1));
-        for(j=0;j<5;j++) outmembers[i+NISO*2][j]=mychar[j];
-        outtypes[ i+NISO*2 ] = SDF_INT;
-    }
-*/
 
 /*
     fnames = make_spec_names('f', NISO);
@@ -397,7 +373,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     if (!newabund) printf("error allocating newabund\n");
 
     /* read in abundance data - WORKS!!*/
-    fap = fopen("abundances", "r");
+    fap = fopen("abun.dat", "r");
     if (!fap) printf("error opening file abun.dat\n");
 
     /*read in abundances, one set for each radial bin*/
@@ -578,8 +554,8 @@ void renorm(int **want, float newabund[], float abundarr[], int nparr[], int nna
             if((want[0][i] == 26) && (want[1][i] == 30)) fe56 = i;
         }
 
+		/* figure out where we are */
         if(is_in_arr == 0) {
-            /* figure out where we are */
             if (nparr[j] >= want[0][Nnw-1])
                 jl = Nnw-1;
             else if (nparr[j] <= want[0][0])
