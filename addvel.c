@@ -171,7 +171,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
 
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    FILE *fap = NULL, *frp = NULL;
+    FILE *frp = NULL;
     int i, j, nvecs, nmembers;
     int len, counter, flag = 0;
     int nrecs;
@@ -190,11 +190,28 @@ static void writestructs(SDF *sdfp, FILE *fp)
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
 
-    alpha = sqrt(1./9.);
-    beta = sqrt(7./9.);
-    /*set_radius = 0.14;*/
+    /* j2 geometry; from Hungerford, Fryer, & Warren 2003 */
 /*
+    alpha = sqrt(3./7.);
+    beta = sqrt(3./7.);
 */
+
+    /* j4 geometry */
+    alpha = sqrt(1./7.);
+    beta = sqrt(9./7.);
+
+    /* e2 geometry */
+/*
+    alpha = 4./3.;
+    beta = 2./3.;
+*/
+
+    /* e4 geometry */
+/*
+    alpha = 8./5.;
+    beta = 6./5.;
+*/
+
     printf("set_radius: enter 0 if set by vr:");
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
@@ -302,12 +319,16 @@ static void writestructs(SDF *sdfp, FILE *fp)
         /* only for expanding velocities */
         if( (fabs((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
             || (radius < set_radius)) {
-/*
-        if(radius < set_radius) {
-*/
+            /* jet geometry */
             vx2 = (alpha + beta * fabs(z) /radius) * vx;
             vy2 = (alpha + beta * fabs(z) /radius) * vy;
             vz2 = (alpha + beta * fabs(z) /radius) * vz;
+            /* equatorial geometry */
+/*
+            vx2 = (alpha - beta * fabs(x) /radius) * vx;
+            vy2 = (alpha - beta * fabs(x) /radius) * vy;
+            vz2 = (alpha - beta * fabs(x) /radius) * vz;
+*/
         } else {
             vx2 = vx * vfactor;
             vy2 = vy * vfactor;

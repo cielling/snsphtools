@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 #include <SDF.h>
 
 typedef enum SDF_type_enum SDF_type_t;
@@ -32,6 +33,8 @@ typedef union {
 
 static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp);
 static void writestructs(SDF *sdfp, FILE *fp);
+
+int logg;
 
 int main(int argc, char *argv[])
 {
@@ -52,8 +55,8 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 {
     char input;
 
-    if (argc != 3) {
-	fprintf(stderr, "Usage: %s SDFfile outfile \n", argv[0]);
+    if (argc != 4) {
+	fprintf(stderr, "Usage: %s SDFfile outfile log_flag\n", argv[0]);
 	exit(1);
     }
 
@@ -77,6 +80,11 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 	exit(errno);
     }
 
+    logg = atoi(argv[3]);
+    printf("%d ", logg);
+    if(logg) printf("calculating log abundances\n");
+    else printf("calculating linear abundances\n");
+
 }
 
 /*this writes the actual data*/
@@ -93,6 +101,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int nlines = 1, nrecs;
     int index[num];
     double x, y, z;
+    float rho;
     /*make INCR and nlines user input */
 
 /* this does not attempt to load the whole file into memory, does it? -CE */
@@ -114,10 +123,25 @@ static void writestructs(SDF *sdfp, FILE *fp)
         }
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "f14", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[6]=i;
+        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f4", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f3", strlen(vecs[i])) == 0) index[6]=i;
+/*
+        if (strncmp(vecs[i], "f1", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[6]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f17", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
+
+        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f18", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[6]=i;
+
+        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[5]=i;
+*/
 /*
         if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
@@ -155,6 +179,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     /*calculate the byte offset in memory to the address of the next member-CE*/
 	addrs[0] = (char *)btab;
+    strides[0] = outstride;		/* how did this run correctly without this line??? */
 	for ( i = 1; i < num; i++) {
             addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
             strides[i] = outstride;
@@ -178,28 +203,34 @@ static void writestructs(SDF *sdfp, FILE *fp)
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
+        rho = *((float *)(btab + inoffsets[4]));
 
 /*
         if((x >= 0.0) && (y >= 0.0) && (z >= 0.0)) {
 */
-        for( k = 0; k < num; k++) {
-            type = SDFtype(members[k], sdfp);
-            switch(type) {
-            case SDF_FLOAT:
-                fprintf(fp, "%+13E\t", *(float *)(btab + inoffsets[k]));
-                break;
-            case SDF_DOUBLE:
-                fprintf(fp, "%+13E\t", *(double *)(btab + inoffsets[k]));
-                break;
-            default:
-                printf("no such type: %s\n", type);
-                exit(1);
+        if( rho >= 4.0e-7) {
+            for( k = 0; k < num; k++) {
+                if(logg && (k>2)){
+                *((float *)(btab + inoffsets[k])) = log10(*((float *)(btab + inoffsets[k]))+1.e-20);
+                }
+                type = SDFtype(members[k], sdfp);
+                switch(type) {
+                case SDF_FLOAT:
+                    fprintf(fp, "%+13E\t", *(float *)(btab + inoffsets[k]));
+                    break;
+                case SDF_DOUBLE:
+                    fprintf(fp, "%+13E\t", *(double *)(btab + inoffsets[k]));
+                    break;
+                default:
+                    printf("no such type: %s\n", type);
+                    exit(1);
+                }
             }
-        }
-        fprintf(fp,"\n");
+
+            fprintf(fp,"\n");
 /*
-        }
 */
+        }
 
     }
 

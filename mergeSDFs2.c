@@ -198,15 +198,15 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     size_t outstride = 0;
     void *btab;
     void **addrs;
-    int *inoffsets, *strides, *starts, *lines;
-    int incr=1, stride = 0, flag=0;
+    int *inoffsets, *strides, *starts, *lines, *order;
+    int incr=1, stride = 0, flag=0, ind = 0;;
     int npart1, npart2, newnpart, countnpart;
     int digits, newdigits,ident, idindex, identmax = 0;
     fpos_t pos1_npart, pos_npart;
     double x, y, z;
     float radius, R0;
     int abarr1[2][22], abarr2[2][22];
-    int abinfo1, abinfo2, first=1, abundflag=0,k;
+    int abinfo1= -1, abinfo2=-1, first=1, abundflag=0,k;
 
     /* count number of data columns, i.e. struct members with more than one element */
     /* this method assumes that "x" is the first data column */
@@ -217,17 +217,28 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     nvecs1 = SDFnvecs(sdfp1);
     vecs1 = SDFvecnames(sdfp1);
 
+	ind = 0;
+
     flag = 0;
     for (i = 0, nmembers1 = 0; i < nvecs1; ++i) {
+		//printf("%s\n",vecs1[i]);
         if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) {
             /* x is the first member of the structure */
             flag=1;
         }
-	if (flag) ++nmembers1;
+		if (flag) ++nmembers1;
+        if( strncmp(vecs1[i],"p1",strlen(vecs1[i])) == 0) abinfo1=i;
+		if( (abinfo1 > 0) && (i-abinfo1 < 44) ) {
+			SDFgetint(sdfp1, vecs1[i], &abarr1[ind][(int)((i-abinfo1)/2)]);
+			ind = ind > 0 ? 0 : 1;
+			printf("%d %s\n",ind, vecs1[i]);
+		}
     }
 
     nvecs2 = SDFnvecs(sdfp2);
     vecs2 = SDFvecnames(sdfp2);
+
+	ind = 0;
 
     flag = 0;
     for (i = 0, nmembers2 = 0; i < nvecs2; ++i) {
@@ -236,6 +247,11 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
             flag=1;
         }
 	if (flag) ++nmembers2;
+        if( strncmp(vecs2[i],"p1",strlen(vecs2[i])) == 0) abinfo2=i;
+		if( (abinfo2 > 0) && (i-abinfo2 < 44) ) {
+			SDFgetint(sdfp2, vecs2[i], &abarr2[ind][(int)((i-abinfo2)/2)]);
+			ind = (ind != 1);
+		}
     }
 
     /* prompt user for merger radius */
@@ -247,12 +263,103 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     SDFgetint(sdfp2, "npart", &npart2);
     printf("%d and %d particles\n", npart1, npart2);
 
-    if( nmembers1 <= nmembers2) {
-       maxmbrs = nmembers1;
-    } else { maxmbrs = nmembers2;}
+
+	maxmbrs = nmembers1 > nmembers2 ? nmembers1 : nmembers2;
+	printf("maxmbrs = %d\n", maxmbrs);
+
+	if( nvecs1 != nvecs2 ) {
+
+		printf("different content in headers! %d vs %d\n\n", nvecs1, nvecs2);
+		for(i=0; i< (nvecs1 > nvecs2 ? nvecs2 : nvecs1); i++)
+			printf("%d) %s   %s\n",i,vecs1[i], vecs2[i]);
+/* TO DO: find correspondence between the headers --- done ~CIE */
+		if( nvecs1 > nvecs2 ){
+
+			j = 0;
+			order=(int *)malloc( sizeof(int)*nvecs1 );
+			do{
+				order[j] = -1;
+				for( i=0; i< nvecs2; i++) {
+					if( strncmp(vecs1[j],vecs2[i],strlen(vecs1[j])) == 0)
+						order[j]=i;
+				}
+				j++;
+			} while(j < nvecs1);
+
+		} else {
+
+			j = 0;
+			order=(int *)malloc( sizeof(int)*nvecs2 );
+			do {
+				order[j] = -1;
+				for( i=0; i< nvecs1; i++) {
+					if( strncmp(vecs2[j],vecs1[i],strlen(vecs2[j])) == 0)
+						order[j]=i;
+				}
+				j++;
+			}while(j < nvecs2);
+
+		}
+
+	} if( nmembers1 != nmembers2 ) {
+
+		printf("different content in structs! %d vs %d\n\n", nvecs1, nvecs2);
+		for(i=0; i< (nmembers1 > nmembers2 ? nmembers1 : nmembers2); i++)
+			printf("%s   %s\n",vecs1[nvecs1-1-i], vecs2[nvecs2-1-i]);
+
+		if( nmembers1 > nmembers2 ){
+
+			j = 0;
+			order=(int *)malloc( sizeof(int)*nmembers1 );
+			do {
+				order[j] = -1;
+				for( i=0; i< nmembers2; i++) {
+					/* go backward since we don't know the size of the header yet */
+					if( strncmp(vecs1[nvecs1-1-j],vecs2[nvecs2-1-i],strlen(vecs1[nvecs1-1-j])) == 0)
+						order[nmembers1-1-j]=i;
+				}
+				j++;
+			}while(j < nmembers1) ;
+
+		} else {
+
+			j = 0;
+			order=(int *)malloc( sizeof(int)*nmembers2 );
+			do {
+				order[j] = -1;
+				for( i=0; i< nmembers1; i++) {
+					if( strncmp(vecs2[nvecs2-1-j],vecs1[nvecs1-1-i],strlen(vecs2[nvecs2-1-j])) == 0)
+						order[nmembers2-1-j]=i;
+				}
+				j++;
+			}while(j < nmembers2) ;
+
+		}
+
+
+	} else {
+
+		for( i = 0; i < nmembers1; i++ ) {
+			if( (abarr1[0][i] != abarr2[0][i]) || (abarr1[1][i] != abarr2[1][i]) )
+				abundflag = 1;
+		}
+
+        /* check if the abundance information is the same in both files, and spit
+         * out a warning if it is not */
+        /* Note: doesn't seem to be working yet */
+        if(abundflag == 1) {
+           printf("warning: abundance info in files might not be the same!\n");
+           printf("%10s %10s\n%5s%5s %5s%5s\n", "file1", "file2","p","n","p","n");
+           for(k=0;k<22;k++) printf("%5d%5d %5d%5d\n",
+               abarr1[0][k],abarr1[1][k],abarr2[0][k],abarr2[1][k]);
+        }
+
+	}
+
 
     /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc(maxmbrs * sizeof(char *));
+    if(members == NULL) printf("allocation error\n");
     addrs = (void **)malloc(maxmbrs * sizeof(void *));
     types = (SDF_type_t *)malloc(maxmbrs * sizeof(SDF_type_t));
     inoffsets = (int *)malloc(maxmbrs * sizeof(int));
@@ -262,12 +369,20 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
     printf("done malloc'ing\n");
 
-    /* find the file with the fewer members and write its header to output */
+    /* if nvecs1 != nvecs2 there are two options:
+		- use shorter header and skip extra data
+		- use longer header and fill extra data with zeros
+	   For now, do option 2, as the extra data is bndry info that
+	   I don't want to skip. -CIE
+	*/
     /* done by populating the output arrays from the appropriate file */
 
     flag = 0;
-    if ( nmembers1 < nmembers2) {
-    /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
+/* note-to-self: temporary solution, clean up eventually! ~CIE */
+    if ( (nmembers1 > nmembers2) || (nvecs1 > nvecs2) ) {
+		printf("doing file 1\n");
+
+    /*one by one, go through the fields in the column, i.e. members of the struct?-CIE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs1; ++i) {
 
             if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) flag=1;
@@ -283,14 +398,19 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 
             /* get index that holds 'ident' for later updating */
             if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
+/*
             if(strncmp(vecs1[i],"p1",strlen(vecs1[i])) == 0) abinfo1=nmembers-1;
+*/
 
         }
         for (i = 0; i < nmembers; i++)
             strides[i] = stride;
+		printf("file 1 stride = %d\n",stride);
 
     } else {
-    /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
+		printf("doing file 2\n");
+
+    /*one by one, go through the fields in the column, i.e. members of the struct?-CIE*/
         for (i = 0, stride = 0, nmembers = 0; i < nvecs2; ++i) {
 
             if (strncmp(vecs2[i], "x", strlen(vecs2[i])) == 0) flag=1;
@@ -305,16 +425,19 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	    }
 
             /* get index that holds 'ident' for later updating */
-            if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
+            if (strncmp(vecs2[i], "ident", strlen(vecs2[i])) == 0) idindex=nmembers-1;
+/*
             if(strncmp(vecs2[i],"p1",strlen(vecs2[i])) == 0) abinfo2=nmembers-1;
+*/
 
         }
         for (i = 0; i < nmembers; i++)
             strides[i] = stride;
+		printf("file 2 stride = %d\n",stride);
 
     }
 
-    /* unnecesary, just use 'stride' ? CE */
+    /* unnecesary, just use 'stride' ? CIE */
     outstride = 0;
     for(i=0; i< maxmbrs; i++) outstride += SDFtype_sizes[ types[i] ];
 
@@ -330,13 +453,14 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
      * are merged in their entirety. Returns the location in memory where the
      * total particle number is stored so it can be updated later */
 
-    if (nmembers1 < nmembers2) {
+    if (nmembers1 > nmembers2) {
         writescalars(sdfp2, fp, &pos_npart,npart1+npart2);
     } else {
         writescalars(sdfp1, fp, &pos_npart,npart1+npart2);
     }
 
-    /*print the struct declaration part from the header-CE*/
+    /*print the struct declaration part from the header-CIE*/
+/* TO DO: update 'R0' */
     fprintf(fp, "struct {\n");
     for (i = 0; i < maxmbrs; ++i) {
 	switch (types[i]) {
@@ -360,7 +484,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
 
-    /*calculate the byte offset in memory to the address of the next member-CE*/
+    /*calculate the byte offset in memory to the address of the next member-CIE*/
     addrs[0] = (char *)btab;
     for (i=1; i< maxmbrs; i++)
          addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
@@ -383,15 +507,9 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
 
-        if(first) {
-            for(k=0;k<22;k++){
-                abarr1[0][k] = *((int *)(btab + inoffsets[abinfo1+k]));/*Z*/
-                abarr1[1][k] = *((int *)(btab + inoffsets[abinfo1+22+k]));/*N*/
-            }
-        }
         first=0;
 
-	/*dump the btab data into the file now-CE*/
+	/*dump the btab data into the file now-CIE*/
         if( (radius < R0 ) ) {
 	    fwrite(btab, outstride, 1, fp);
             /* count number of particles actually writted */
@@ -431,24 +549,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
-
-        /* check if the abundance information is the same in both files, and spit
-         * out a warning if it is not */
-        /* Note: doesn't seem to be working yet */
-        if(first) {
-            for(k=0;k<22;k++){
-                abarr2[0][k] = *((int *)(btab + inoffsets[abinfo2+k]));/*Z*/
-                abarr2[1][k] = *((int *)(btab + inoffsets[abinfo2+22+k]));/*N*/
-                if((abarr1[0][k] != abarr2[0][k]) || (abarr1[1][k] != abarr2[1][k]))
-                   abundflag=1;
-            }
-        }
-        if(first && (abundflag == 1)) {
-           printf("warning: abundance info in files might not be the same!\n");
-           printf("%10s %10s\n%5s%5s %5s%5s\n", "file1", "file2","p","n","p","n");
-           for(k=0;k<22;k++) printf("%5d%5d %5d%5d\n",
-               abarr1[0][k],abarr1[1][k],abarr2[0][k],abarr2[1][k]);
-        }
         first=0;
 	/*dump the btab data into the file now-CE*/
         if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
@@ -487,10 +587,13 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 /*    free(members);
     free(btab);
     free(addrs);
+*/
     free(types);
     free(inoffsets);
-*/
+	free(starts);
+	free(lines);
     /*free(outbtab);*/
+	free(order);
 }
 
 

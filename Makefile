@@ -6,28 +6,30 @@ LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
 LDLIBS = -lsw
 
 #PROGS = zonetopartid
-#PROGS= readsection
+#PROGS= readsection3
 #PROGS= addabundance
-#PROGS= mergeSDFs
+#PROGS= mergeSDFs2
 #PROGS= SDFtoASCII-batch
-PROGS= SDFtoASCII
+#PROGS= SDFtoASCII
 #PROGS= maketraj
 #PROGS= readanSDF
 #PROGS= convertff
+PROGS= get_bndry
 
 .PHONY: all clean
 
 all: $(PROGS)
 
 #zonetopartid: zonetopartid.o
-#readsection: readsection.o
+#readsection3: readsection3.o
 #addabundance: addabundance.o
-#mergeSDFs: mergeSDFs.o
+#mergeSDFs2: mergeSDFs2.o
 #SDFtoASCII-batch: SDFtoASCII-batch.o
-SDFtoASCII: SDFtoASCII.o
+#SDFtoASCII: SDFtoASCII.o
 #maketraj: maketraj.o
 #readanSDF: readanSDF.o
 #convertff: convertff.o
+get_bndry: get_bndry.o
 
 clean:
 	-$(RM) $(PROGS) *.o *~

@@ -151,7 +151,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
 
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    FILE *fap = NULL;
+    FILE *afp = NULL;
     int i, j, k, nvecs, nmembers, Amembers, ju, jm, jl;
     int numA, Nbins, len, counter, flag = 0;
     int nrecs;
@@ -273,25 +273,25 @@ static void writestructs(SDF *sdfp, FILE *fp)
     /* now need to read in the abundances, and other necessary stuff */
 
     /* get Z and N of isotopes - WORKS!!*/
-    fap = fopen("abundancereadme", "r");
-    if (!fap) printf("error opening file abundancereadme\n");
+    afp = fopen("abundancereadme", "r");
+    if (!afp) printf("error opening file abundancereadme\n");
 
     /*read in first number, that's the number of isotopes in the file*/
-    fscanf(fap, "%3d", &numA);
+    fscanf(afp, "%3d", &numA);
 
     nparr = (int *)malloc(numA * sizeof(int));
     nnarr = (int *)malloc(numA * sizeof(int));
 
-    for ( i = 0; i < numA; i++) fscanf(fap, "%d", &nparr[i]);
-    for ( i = 0; i < numA; i++) fscanf(fap, "%d", &nnarr[i]);
+    for ( i = 0; i < numA; i++) fscanf(afp, "%d", &nparr[i]);
+    for ( i = 0; i < numA; i++) fscanf(afp, "%d", &nnarr[i]);
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
 
     /* read in the radial bins - WORKS!!*/
-    fap = fopen("inputh.dat", "r");
-    if (!fap) printf("error opening inputh.dat\n");
+    afp = fopen("inputh.dat", "r");
+    if (!afp) printf("error opening inputh.dat\n");
 
     /*malloc array and read in radial bins. don't know how many, but guess 1000
       and realloc later if we run out of space -CE */
@@ -299,15 +299,15 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     Nbins = 0;
     do {
-        fscanf(fap, "%21G", &radbin[Nbins++]);
-        fscanf(fap, "%*21g"); /* reads in h's. not needed */
+        fscanf(afp, "%21G", &radbin[Nbins++]);
+        fscanf(afp, "%*21g"); /* reads in h's. not needed */
         if(!(Nbins % 1000)) realloc(radbin, (Nbins+1000)*sizeof(float));
     /*} while(radbin[Nbins-1] < 6.2e4);*/
-    } while(!feof(fap));
+    } while(!feof(afp));
     Nbins--;
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
     /* malloc 2D array for abundances[radial bin][isotope] -CE */
     abundarr = (float **)malloc(Nbins * sizeof( float *));
@@ -319,18 +319,18 @@ static void writestructs(SDF *sdfp, FILE *fp)
     }
 
     /* read in abundance data - WORKS!!*/
-    fap = fopen("abun.dat", "r");
-    if (!fap) printf("error opening file abun.dat\n");
+    afp = fopen("abun.dat", "r");
+    if (!afp) printf("error opening file abun.dat\n");
 
     /*read in abundances, one set for each radial bin*/
     for (i=0; i< Nbins; i++){
         for (j=0; j < numA; j++) {
-            fscanf(fap, "%12G", &abundarr[i][j]);
+            fscanf(afp, "%12G", &abundarr[i][j]);
         }
     }
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
 
     for (j = 0; j < nobjs[0]; ++j) {

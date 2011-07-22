@@ -181,9 +181,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
         }
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "vy", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "vz", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f18", strlen(vecs[i])) == 0) index[5]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[6]=i;
 	if (flag) ++nmembers;
     }

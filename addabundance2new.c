@@ -184,7 +184,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
 
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    FILE *fap = NULL, *frp = NULL;
+    FILE *afp = NULL, *frp = NULL;
     int i, j, k, nvecs, nmembers, Amembers, ju, jm, jl;
     int numA, Nbins, counter, flag = 0;
     int nrecs = 0;
@@ -222,11 +222,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
     printf("nmembers = %d\n",nmembers);
 
     /* read in the list of isotopes in the network */
-    fap = fopen("network.isotopes", "r");
-    if (!fap) printf("error opening files network.isotopes\n");
+    afp = fopen("network.isotopes", "r");
+    if (!afp) printf("error opening files network.isotopes\n");
 
-    fscanf(fap, "%d", &NNW);
-    fscanf(fap, "%s\t%s", tmpchr,tmpchr);
+    fscanf(afp, "%d", &NNW);
+    fscanf(afp, "%s\t%s", tmpchr,tmpchr);
 
     /* this way nwlist is indexed the same way as want */
     nwlist = (int **) malloc ( 2 * sizeof(int *) );
@@ -234,12 +234,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     nwlist[1] = (int *) malloc ( NNW * sizeof(int) );
 
     for( i = 0; i < NNW; i++) {
-        fscanf(fap, "%d", &nwlist[0][i]);
-        fscanf(fap, "%d", &nwlist[1][i]);
+        fscanf(afp, "%d", &nwlist[0][i]);
+        fscanf(afp, "%d", &nwlist[1][i]);
     }
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
     NISO = NNW;
     Amembers = 1*NISO;
@@ -314,51 +314,51 @@ static void writestructs(SDF *sdfp, FILE *fp)
     /* now need to read in the abundances, and other necessary stuff */
 
     /* get Z and N of isotopes - WORKS!!*/
-    fap = fopen("abundancereadme", "r");
-    if (!fap) printf("error opening file abundancereadme\n");
+    afp = fopen("abundancereadme", "r");
+    if (!afp) printf("error opening file abundancereadme\n");
 
     /*read in first number, that's the number of isotopes in the file*/
-    fscanf(fap, "%3d", &numA);
+    fscanf(afp, "%3d", &numA);
 
     nparr = (int *)malloc(numA * sizeof(int));
     nnarr = (int *)malloc(numA * sizeof(int));
 
-    for ( i = 0; i < numA; i++) fscanf(fap, "%d", &nparr[i]);
-    for ( i = 0; i < numA; i++) fscanf(fap, "%d", &nnarr[i]);
+    for ( i = 0; i < numA; i++) fscanf(afp, "%d", &nparr[i]);
+    for ( i = 0; i < numA; i++) fscanf(afp, "%d", &nnarr[i]);
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
 
     /* read in the radial bins - WORKS!!*/
-    fap = fopen("inputh.dat", "r");
-    if (!fap) printf("error opening inputh.dat\n");
+    afp = fopen("inputh.dat", "r");
+    if (!afp) printf("error opening inputh.dat\n");
 
     /* count number of radial bins */
     Nbins = 0;
     do {
-        fscanf(fap,"%E %E\n", &tmpval1, &tmpval2);
+        fscanf(afp,"%E %E\n", &tmpval1, &tmpval2);
         ++Nbins;
-    } while(!feof(fap));
+    } while(!feof(afp));
     /*} while(radbin[Nbins-1] < 4.3e2);*/
     printf("Nbins: %d ",Nbins);
 
-    rewind(fap);
+    rewind(afp);
 
     /* read in radial bins into radbin */
     radbin = (float *)malloc(Nbins * sizeof(float));
     if(!radbin) printf("error allocating radbin\n");
 
     for( i = 0; i < Nbins; i++) {
-        fscanf(fap, "%E %*E", &radbin[i]);
+        fscanf(afp, "%E %*E", &radbin[i]);
     /* realloc seems to be dangerous and perhaps causing occasional seg faults
      * and is disliked by valgrind.
         if(!(Nbins % 1000)) realloc(radbin, (Nbins+1000)*sizeof(float));
      */
      }
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
     /* malloc 2D array for abundances[radial bin][isotope] -CE */
     abundarr = (float **)malloc(Nbins * sizeof( float *));
@@ -373,18 +373,21 @@ static void writestructs(SDF *sdfp, FILE *fp)
     if (!newabund) printf("error allocating newabund\n");
 
     /* read in abundance data - WORKS!!*/
-    fap = fopen("abun.dat", "r");
-    if (!fap) printf("error opening file abun.dat\n");
+/*
+    afp = fopen("abundances2", "r");
+*/
+    afp = fopen("abun.dat", "r");
+    if (!afp) printf("error opening file abun.dat\n");
 
     /*read in abundances, one set for each radial bin*/
     for (i=0; i< Nbins; i++){
         for (j=0; j < numA; j++) {
-            fscanf(fap, "%12G", &abundarr[i][j]);
+            fscanf(afp, "%12G", &abundarr[i][j]);
         }
     }
 
-    fclose(fap);
-    fap = NULL;
+    fclose(afp);
+    afp = NULL;
 
     /* print Z and N of isotopes of choice */
     for( i = 0; i < NISO; i++ ) {
@@ -481,18 +484,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
                        &newabund[k] , SDFtype_sizes[ outtypes[ k ] ]);
                        /*&abundarr[jl][i] , SDFtype_sizes[ outtypes[ k ] ]);*/
 
-                    /* fill in nprotons in isotope */
-/*
-                     memcpy(outbtab + outoffsets[ k+NISO ],
-                       &nparr[i] , SDFtype_sizes[ outtypes[ k+NISO ] ]);
-*/
-
-                    /* fill in nneutrons in isotope */
-/*
-                    memcpy(outbtab + outoffsets[ k+NISO*2 ],
-                       &nnarr[i] , SDFtype_sizes[ outtypes[ k+NISO*2 ] ]);
-*/
-
                     counter++;
                 }
             }
@@ -508,17 +499,22 @@ static void writestructs(SDF *sdfp, FILE *fp)
     free(pnames);
     free(nnames);
     free(fnames);
+    printf("free'd names\n");
     free(members);
     free(addrs);
     free(strides);
+    printf("free'd members addrs strides\n");
     free(nobjs);
     free(starts);
     free(types);
+    printf("free'd nobjs starts types\n");
     free(inoffsets);
     free(outoffsets);
+    printf("free'd offsets\n");
 
     free(btab);
     free(outbtab);
+    printf("free'd btabs\n");
 }
 
 

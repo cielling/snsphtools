@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 {
     SDF *sdfp = NULL;
     FILE *fp = NULL;
-    FILE *fap = NULL;
+    FILE *f2p = NULL;
     int nmembers, nrecs, nvecs, idindex, ident, i, j, k, jl, jm, ju;
     int numA, Nbins, len, counter, flag = 0;
     int *nparr, *nnarr;
@@ -110,25 +110,25 @@ int main(int argc, char *argv[])
     /* now need to read in the abundances, and other necessary stuff */
 
     /* get Z and N of isotopes - WORKS!!*/
-    fap = fopen("abundancereadme", "r");
-    if (!fap) printf("error opening file abundancereadme\n");
+    f2p = fopen("abundancereadme", "r");
+    if (!f2p) printf("error opening file abundancereadme\n");
 
     /*read in first number, that's the number of isotopes in the file*/
-    fscanf(fap, "%3d", &numA);
+    fscanf(f2p, "%3d", &numA);
 
     nparr = (int *)malloc(numA * sizeof(int));
     nnarr = (int *)malloc(numA * sizeof(int));
 
-    for ( i = 0; i < numA; i++) fscanf(fap, "%d", &nparr[i]);
-    for ( i = 0; i < numA; i++) fscanf(fap, "%d", &nnarr[i]);
+    for ( i = 0; i < numA; i++) fscanf(f2p, "%d", &nparr[i]);
+    for ( i = 0; i < numA; i++) fscanf(f2p, "%d", &nnarr[i]);
 
-    fclose(fap);
-    fap = NULL;
+    fclose(f2p);
+    f2p = NULL;
 
 
     /* read in the radial bins - WORKS!!*/
-    fap = fopen("inputh.dat", "r");
-    if (!fap) printf("error opening inputh.dat\n");
+    f2p = fopen("inputh.dat", "r");
+    if (!f2p) printf("error opening inputh.dat\n");
 
     /*malloc array and read in radial bins. don't know how many, but guess 1000
       and realloc later if we run out of space -CE */
@@ -136,15 +136,15 @@ int main(int argc, char *argv[])
 
     Nbins = 0;
     do {
-        fscanf(fap, "%21G", &radbin[Nbins++]);
-        fscanf(fap, "%*21g"); /* reads in h's. not needed */
+        fscanf(f2p, "%21G", &radbin[Nbins++]);
+        fscanf(f2p, "%*21g"); /* reads in h's. not needed */
         if(!(Nbins % 1000)) realloc(radbin, (Nbins+1000)*sizeof(float));
-    } while( !feof(fap) );
+    } while( !feof(f2p) );
     Nbins--;
     /*} while(radbin[Nbins-1] < 4.3e2);*/
 
-    fclose(fap);
-    fap = NULL;
+    fclose(f2p);
+    f2p = NULL;
 
     /* malloc 2D array for abundances[radial bin][isotope] -CE */
     abundarr = (float **)malloc(Nbins * sizeof( float *));
@@ -156,18 +156,18 @@ int main(int argc, char *argv[])
     }
 
     /* read in abundance data - WORKS!!*/
-    fap = fopen("abun.dat", "r");
-    if (!fap) printf("error opening file abun.dat\n");
+    f2p = fopen("abun.dat", "r");
+    if (!f2p) printf("error opening file abun.dat\n");
 
     /*read in abundances, one set for each radial bin*/
     for (i=0; i< Nbins; i++){
         for (j=0; j < numA; j++) {
-            fscanf(fap, "%12E", &abundarr[i][j]);
+            fscanf(f2p, "%12E", &abundarr[i][j]);
         }
     }
 
-    fclose(fap);
-    fap = NULL;
+    fclose(f2p);
+    f2p = NULL;
 
     fp = fopen("zonetopartid.dat", "w");
     if(!fp) printf("error opening file 'zonetopartid.dat'\n");
