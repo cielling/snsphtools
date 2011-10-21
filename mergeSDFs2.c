@@ -59,6 +59,17 @@ static void writeinit(FILE *fp);
 /*static void writescalars(SDF *sdfp1, FILE *fp, fpos_t *pos_npart, int npart);*/
 static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp);
 
+int prep_SDF_args(SDF *sdfp, char **vecs, int nvecs, char ***members, int *nmembers, SDF_type_t **types, int **offsets, int **strides, int **lines, size_t *stride);
+
+int verify_head(char **vecs1, int nvecs1, int nmembers1, char **vecs2, int nvecs2, int nmembers2, int **ordhead);
+
+int verify_body(char **vecs1, int nvecs1, int nmembers1, char **vecs2, int nvecs2, int nmembers2, int **ordbody);
+
+int verify_abun(int abarr1[][22], int abarr2[][22], int nmembers1);
+
+
+
+
 int main(int argc, char *argv[])
 {
     SDF *sdfp1 = NULL;
@@ -71,8 +82,10 @@ int main(int argc, char *argv[])
     writestructs(sdfp1, sdfp2, fp);
 
     fclose(fp);
+/*
     SDFclose(sdfp1);
     SDFclose(sdfp2);
+*/
 
     return 0;
 }
@@ -192,21 +205,25 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int npart)
 /*this writes the actual data*/
 static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 {
-    int i, j, nvecs1, nvecs2, nmembers, nmembers1, nmembers2, maxmbrs;
+    int i, j, k, nvecs1, nvecs2;
+	int nmembers, nmembers1, nmembers2, maxmbrs, minmbrs;
     char **vecs1, **vecs2, **members;
-    SDF_type_t *types;
-    size_t outstride = 0;
-    void *btab;
+    SDF_type_t *types, *outtypes;
+	SDF *sdfp = NULL;
+    size_t outstride = 0, stride = 0;
+    void *btab, *outbtab;
     void **addrs;
-    int *inoffsets, *strides, *starts, *lines, *order;
-    int incr=1, stride = 0, flag=0, ind = 0;;
-    int npart1, npart2, newnpart, countnpart;
+    int *inoffsets, *strides, *starts, *lines, *ordhead, *ordbody;
+	int *outoffsets;
+    int incr=1, flag=0, ind = 0, second = 0;
+    int npart, npart1, npart2, newnpart, countnpart;
     int digits, newdigits,ident, idindex, identmax = 0;
+	int sort_head=0, sort_body=0;
     fpos_t pos1_npart, pos_npart;
     double x, y, z;
     float radius, R0;
     int abarr1[2][22], abarr2[2][22];
-    int abinfo1= -1, abinfo2=-1, first=1, abundflag=0,k;
+    int abinfo1= -1, abinfo2=-1;
 
     /* count number of data columns, i.e. struct members with more than one element */
     /* this method assumes that "x" is the first data column */
@@ -231,7 +248,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 		if( (abinfo1 > 0) && (i-abinfo1 < 44) ) {
 			SDFgetint(sdfp1, vecs1[i], &abarr1[ind][(int)((i-abinfo1)/2)]);
 			ind = ind > 0 ? 0 : 1;
-			printf("%d %s\n",ind, vecs1[i]);
 		}
     }
 
@@ -264,110 +280,24 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     printf("%d and %d particles\n", npart1, npart2);
 
 
+/*
 	maxmbrs = nmembers1 > nmembers2 ? nmembers1 : nmembers2;
+	minmbrs = nmembers1 > nmembers2 ? nmembers2 : nmembers1;
+*/
+	maxmbrs = nmembers1;
+	minmbrs = nmembers2;
 	printf("maxmbrs = %d\n", maxmbrs);
 
-	if( nvecs1 != nvecs2 ) {
 
-		printf("different content in headers! %d vs %d\n\n", nvecs1, nvecs2);
-		for(i=0; i< (nvecs1 > nvecs2 ? nvecs2 : nvecs1); i++)
-			printf("%d) %s   %s\n",i,vecs1[i], vecs2[i]);
-/* TO DO: find correspondence between the headers --- done ~CIE */
-		if( nvecs1 > nvecs2 ){
+	/*check for correspondence between headers */
+	sort_head = verify_head(vecs1, nvecs1, nmembers1, vecs2, nvecs2, nmembers2, &ordhead);
 
-			j = 0;
-			order=(int *)malloc( sizeof(int)*nvecs1 );
-			do{
-				order[j] = -1;
-				for( i=0; i< nvecs2; i++) {
-					if( strncmp(vecs1[j],vecs2[i],strlen(vecs1[j])) == 0)
-						order[j]=i;
-				}
-				j++;
-			} while(j < nvecs1);
+	/*check for correspondence between structs */
+	sort_body = verify_body(vecs1, nvecs1, nmembers1, vecs2, nvecs2, nmembers2, &ordbody);
 
-		} else {
+	if(nmembers1 == nmembers2)
+		verify_abun(abarr1, abarr2, nmembers2);
 
-			j = 0;
-			order=(int *)malloc( sizeof(int)*nvecs2 );
-			do {
-				order[j] = -1;
-				for( i=0; i< nvecs1; i++) {
-					if( strncmp(vecs2[j],vecs1[i],strlen(vecs2[j])) == 0)
-						order[j]=i;
-				}
-				j++;
-			}while(j < nvecs2);
-
-		}
-
-	} if( nmembers1 != nmembers2 ) {
-
-		printf("different content in structs! %d vs %d\n\n", nvecs1, nvecs2);
-		for(i=0; i< (nmembers1 > nmembers2 ? nmembers1 : nmembers2); i++)
-			printf("%s   %s\n",vecs1[nvecs1-1-i], vecs2[nvecs2-1-i]);
-
-		if( nmembers1 > nmembers2 ){
-
-			j = 0;
-			order=(int *)malloc( sizeof(int)*nmembers1 );
-			do {
-				order[j] = -1;
-				for( i=0; i< nmembers2; i++) {
-					/* go backward since we don't know the size of the header yet */
-					if( strncmp(vecs1[nvecs1-1-j],vecs2[nvecs2-1-i],strlen(vecs1[nvecs1-1-j])) == 0)
-						order[nmembers1-1-j]=i;
-				}
-				j++;
-			}while(j < nmembers1) ;
-
-		} else {
-
-			j = 0;
-			order=(int *)malloc( sizeof(int)*nmembers2 );
-			do {
-				order[j] = -1;
-				for( i=0; i< nmembers1; i++) {
-					if( strncmp(vecs2[nvecs2-1-j],vecs1[nvecs1-1-i],strlen(vecs2[nvecs2-1-j])) == 0)
-						order[nmembers2-1-j]=i;
-				}
-				j++;
-			}while(j < nmembers2) ;
-
-		}
-
-
-	} else {
-
-		for( i = 0; i < nmembers1; i++ ) {
-			if( (abarr1[0][i] != abarr2[0][i]) || (abarr1[1][i] != abarr2[1][i]) )
-				abundflag = 1;
-		}
-
-        /* check if the abundance information is the same in both files, and spit
-         * out a warning if it is not */
-        /* Note: doesn't seem to be working yet */
-        if(abundflag == 1) {
-           printf("warning: abundance info in files might not be the same!\n");
-           printf("%10s %10s\n%5s%5s %5s%5s\n", "file1", "file2","p","n","p","n");
-           for(k=0;k<22;k++) printf("%5d%5d %5d%5d\n",
-               abarr1[0][k],abarr1[1][k],abarr2[0][k],abarr2[1][k]);
-        }
-
-	}
-
-
-    /*malloc memory space for the respective features of the struct-CE*/
-    members = (char **)malloc(maxmbrs * sizeof(char *));
-    if(members == NULL) printf("allocation error\n");
-    addrs = (void **)malloc(maxmbrs * sizeof(void *));
-    types = (SDF_type_t *)malloc(maxmbrs * sizeof(SDF_type_t));
-    inoffsets = (int *)malloc(maxmbrs * sizeof(int));
-    strides = (int *)malloc(maxmbrs * sizeof(int));
-    starts = (int *)malloc(maxmbrs * sizeof(int));
-    lines = (int *)malloc(maxmbrs * sizeof(int));
-
-    printf("done malloc'ing\n");
 
     /* if nvecs1 != nvecs2 there are two options:
 		- use shorter header and skip extra data
@@ -375,95 +305,87 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	   For now, do option 2, as the extra data is bndry info that
 	   I don't want to skip. -CIE
 	*/
-    /* done by populating the output arrays from the appropriate file */
+
+
+    /*malloc memory space for the respective features of the struct-CE*/
+    members = (char **)malloc(maxmbrs * sizeof(char *));
+    if(members == NULL) printf("allocation error\n");
+    addrs = (void **)malloc(maxmbrs * sizeof(void *));
+    types = (SDF_type_t *)malloc(minmbrs * sizeof(SDF_type_t));
+    outtypes = (SDF_type_t *)malloc(maxmbrs * sizeof(SDF_type_t));
+    inoffsets = (int *)malloc(minmbrs * sizeof(int));
+    outoffsets = (int *)malloc(maxmbrs * sizeof(int));
+    strides = (int *)malloc(maxmbrs * sizeof(int));
+    starts = (int *)malloc(maxmbrs * sizeof(int));
+    lines = (int *)malloc(maxmbrs * sizeof(int));
+
+    printf("done malloc'ing\n");
 
     flag = 0;
 /* note-to-self: temporary solution, clean up eventually! ~CIE */
+	/* prepare arguments for SDF-reading the appropriate file */
+/*
     if ( (nmembers1 > nmembers2) || (nvecs1 > nvecs2) ) {
-		printf("doing file 1\n");
-
-    /*one by one, go through the fields in the column, i.e. members of the struct?-CIE*/
-        for (i = 0, stride = 0, nmembers = 0; i < nvecs1; ++i) {
-
-            if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) flag=1;
-
-            if(flag) {
-	        members[nmembers] = vecs1[i];
-	        types[nmembers] = SDFtype(members[nmembers], sdfp1);
-	        inoffsets[nmembers] = stride;
-	        stride += SDFtype_sizes[types[nmembers]];
-                lines[nmembers] = incr;
-                nmembers++;
-            }
-
-            /* get index that holds 'ident' for later updating */
-            if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers-1;
-/*
-            if(strncmp(vecs1[i],"p1",strlen(vecs1[i])) == 0) abinfo1=nmembers-1;
 */
+		printf("doing file 1 first\n");
+		second = 2;
 
-        }
-        for (i = 0; i < nmembers; i++)
-            strides[i] = stride;
-		printf("file 1 stride = %d\n",stride);
+		npart = npart1;
+		sdfp = sdfp1;
+		idindex = prep_SDF_args(sdfp, vecs1, nvecs1, &members, &nmembers,
+								&outtypes, &outoffsets, &strides, &lines, &outstride);
 
+/*
     } else {
-		printf("doing file 2\n");
+		printf("doing file 2 first\n");
+		second = 1;
 
-    /*one by one, go through the fields in the column, i.e. members of the struct?-CIE*/
-        for (i = 0, stride = 0, nmembers = 0; i < nvecs2; ++i) {
-
-            if (strncmp(vecs2[i], "x", strlen(vecs2[i])) == 0) flag=1;
-
-            if(flag) {
-	        members[nmembers] = vecs2[i];
-	        types[nmembers] = SDFtype(members[nmembers], sdfp2);
-	        inoffsets[nmembers] = stride;
-	        stride += SDFtype_sizes[types[nmembers]];
-                lines[nmembers] = incr;
-                nmembers++;
-	    }
-
-            /* get index that holds 'ident' for later updating */
-            if (strncmp(vecs2[i], "ident", strlen(vecs2[i])) == 0) idindex=nmembers-1;
-/*
-            if(strncmp(vecs2[i],"p1",strlen(vecs2[i])) == 0) abinfo2=nmembers-1;
-*/
-
-        }
-        for (i = 0; i < nmembers; i++)
-            strides[i] = stride;
-		printf("file 2 stride = %d\n",stride);
+		npart = npart2;
+		sdfp = sdfp2;
+		idindex = prep_SDF_args(sdfp, vecs2, nvecs2, &members, &nmembers,
+								&outtypes, &outoffsets, &strides, &lines, &outstride);
 
     }
+*/
 
     /* unnecesary, just use 'stride' ? CIE */
+/*
     outstride = 0;
-    for(i=0; i< maxmbrs; i++) outstride += SDFtype_sizes[ types[i] ];
+    for(i=0; i< maxmbrs; i++) outstride += SDFtype_sizes[ outtypes[i] ];
+*/
 
-    printf("outstride = %d\n", outstride);
+    printf("outstride = %d\n", (int)outstride);
 
     /* holds the read in data */
-    btab = (void *)malloc( stride*incr );
+    btab = (void *)malloc( outstride*incr );
+    outbtab = (void *)malloc( outstride*incr );
+
+    /*calculate the byte offset in memory to the address of the next member-CIE*/
+    addrs[0] = (char *)btab;
+    for (i=1; i< maxmbrs; i++)
+         addrs[i] = addrs[i-1] + SDFtype_sizes[ outtypes[i-1] ];
 
 
     printf("printing header\n");
+    writescalars(sdfp1, fp, &pos_npart,npart1+npart2);
 
-    /* writes the new header from the appropriate file. Assumes that both files
-     * are merged in their entirety. Returns the location in memory where the
+    /* writes the new header from the appropriate file.
+     * Returns the location in memory where the
      * total particle number is stored so it can be updated later */
 
-    if (nmembers1 > nmembers2) {
+/*
+    if (nvecs2 > nvecs1) {
         writescalars(sdfp2, fp, &pos_npart,npart1+npart2);
     } else {
         writescalars(sdfp1, fp, &pos_npart,npart1+npart2);
     }
+*/
 
     /*print the struct declaration part from the header-CIE*/
 /* TO DO: update 'R0' */
     fprintf(fp, "struct {\n");
     for (i = 0; i < maxmbrs; ++i) {
-	switch (types[i]) {
+	switch (outtypes[i]) {
 	case SDF_INT:
 	    fprintf(fp, "\tint %s;\n", members[i]);
 	    break;
@@ -484,30 +406,23 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
 
-    /*calculate the byte offset in memory to the address of the next member-CIE*/
-    addrs[0] = (char *)btab;
-    for (i=1; i< maxmbrs; i++)
-         addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
-
-    /*loop over each file consecutively in chunks of data, write that chunk to file*/
-    printf("getting file 1 .... ");
-    for( i=0, countnpart = 0; i < npart1; i++) {
+    /*loop over first file in chunks of data, write that chunk to file*/
+    printf("getting first file .... ");
+    for( i=0, countnpart = 0; i < npart; i++) {
         /* need to increment starts-array */
         for( j = 0; j < maxmbrs; j++)
             starts[j] = i;
 
         /* read data into btab (via addrs) */
-        SDFseekrdvecsarr(sdfp1, maxmbrs, members, starts, lines, addrs, strides);
+        SDFseekrdvecsarr(sdfp, maxmbrs, members, starts, lines, addrs, strides);
 
-        ident = *((int *)(btab + inoffsets[idindex]));
+        ident = *((int *)(btab + outoffsets[idindex]));
 
         /* calculate radius for merging */
-        x = *((double *)(btab + inoffsets[0]));
-        y = *((double *)(btab + inoffsets[1]));
-        z = *((double *)(btab + inoffsets[2]));
+        x = *((double *)(btab + outoffsets[0]));
+        y = *((double *)(btab + outoffsets[1]));
+        z = *((double *)(btab + outoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
-
-        first=0;
 
 	/*dump the btab data into the file now-CIE*/
         if( (radius < R0 ) ) {
@@ -528,17 +443,81 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
     }
     newnpart = countnpart;
 
-    first=1;
-
     printf("got %d lines\n",countnpart);
+
+	SDFclose(sdfp1);
+
+
+	/* prepare arguments for SDF-reading from second file.
+	   Take special care that the 'vecs' are in the same order
+	   as in the first file
+	*/
+	/* I just don't seem to have any luck with realloc ~CIE */
+	free(starts);
+	free(strides);
+	free(lines);
+	for( i = 0; i < maxmbrs; i++)
+		free(members[i]);
+	free(members);
+
+	starts = (int *)malloc( minmbrs*sizeof(int) );
+	strides = (int *)malloc( minmbrs*sizeof(int) );
+	members = (char **)malloc( minmbrs*sizeof(char*) );
+	lines = (int *)malloc( minmbrs*sizeof(int) );
+
+/*
+	if(second == 1) {
+		printf("doing file 1 now\n");
+		sdfp = sdfp1;
+		npart = npart1;
+
+		idindex = prep_SDF_args(sdfp, vecs1, nvecs1, &members, &nmembers,
+								&types, &inoffsets, &strides, &lines, &stride);
+
+		free(btab);
+		btab = (void *)malloc(stride*incr );
+
+*/
+	    /*calculate the byte offset in memory to the address of the next member-CIE*/
+/*
+	    addrs[0] = (char *)btab;
+	    for (i=1; i< minmbrs; i++)
+	         addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
+
+
+	} else if( second == 2) {
+*/
+		printf("doing file 2 now\n");
+		sdfp = sdfp2;
+		npart = npart2;
+
+		idindex = prep_SDF_args(sdfp, vecs2, nvecs2, &members, &nmembers,
+								&types, &inoffsets, &strides, &lines, &stride);
+
+		free(btab);
+		btab = (void *)malloc(stride*incr );
+
+	    /*calculate the byte offset in memory to the address of the next member-CIE*/
+	    addrs[0] = (char *)btab;
+	    for (i=1; i< minmbrs; i++)
+	         addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
+
+
+/*
+	} else printf("huh??\n");
+*/
+
+/* verify that nmembers == minmbrs*/
+
+
     printf("getting file 2 .... ");
-    for( i=0, countnpart = 0; i < npart2; i++) {
+    for( i=0, countnpart = 0; i < npart; i++) {
         /* need to increment starts-array */
-        for( j = 0; j < maxmbrs; j++)
+        for( j = 0; j < nmembers; j++)
             starts[j] = i;
 
         /* read data into btab (via addrs) */
-        SDFseekrdvecsarr(sdfp2, maxmbrs, members, starts, lines, addrs, strides);
+        SDFseekrdvecsarr(sdfp, maxmbrs, members, starts, lines, addrs, strides);
 
         /* update the particle id, so it does not start at 1 again */
         ident = *((int *)(btab + inoffsets[idindex]));
@@ -549,10 +528,25 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
-        first=0;
-	/*dump the btab data into the file now-CE*/
+
+		/*dump the btab data into the file now-CE*/
+		/* sort to match first header first */
+		if( sort_body ) {
+			for( k=0; k < maxmbrs ; k++ ) {
+				memcpy(outbtab + outoffsets[k], &sort_body, SDFtype_sizes[outtypes[k]]);
+				if( ordbody[k] >= 0) {
+					memcpy(outbtab + outoffsets[k], btab + inoffsets[ordbody[k]],
+							SDFtype_sizes[types[ordbody[k]]]);
+				} /*else {
+					memcpy(outbtab + outoffsets[k], 0., types[ordbody]);
+				}*/
+			}
+		} else {
+			memcpy(outbtab, btab, outstride);
+        }
+
         if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
-	    fwrite(btab, outstride, 1, fp);
+	    fwrite(outbtab, outstride, 1, fp);
             /* count number of particles actually writted */
             countnpart++;
         }
@@ -583,6 +577,8 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
         digits--;
     }
 
+	SDFclose(sdfp2);
+
 /*and we're done! clean up now -CE: if it ever works*/
 /*    free(members);
     free(btab);
@@ -593,7 +589,9 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp)
 	free(starts);
 	free(lines);
     /*free(outbtab);*/
-	free(order);
+	if(!ordhead) free(ordhead);
+	if(!ordbody) free(ordbody);
+
 }
 
 
@@ -605,4 +603,187 @@ int GetNumOfDigits(int number) {
         digits++;
     }
     return digits;
+}
+
+
+
+
+int verify_head(char **vecs1, int nvecs1, int nmembers1, char **vecs2, int nvecs2, int nmembers2, int **ordhead)
+{
+	int i,j;
+
+
+	if( (nvecs1-nmembers1) != (nvecs2-nmembers2) ) {
+
+		printf("different content in headers! %d vs %d\n\n", nvecs1, nvecs2);
+		for(i=0; i< (nvecs1 > nvecs2 ? nvecs2 : nvecs1); i++)
+			printf("%d) %s   %s\n",i,vecs1[i], vecs2[i]);
+
+
+		if( (nvecs1-nmembers1) > (nvecs2-nmembers2) ){
+
+			j = 0;
+			(*ordhead) = (int *)malloc( sizeof(int)*(nvecs1-nmembers1) );
+			do{
+				(*ordhead)[j] = -1;
+				for( i=0; i< (nvecs2-nmembers2); i++) {
+					if( strncmp(vecs1[j],vecs2[i],strlen(vecs1[j])) == 0)
+						(*ordhead)[j]=i;
+				}
+				j++;
+			} while(j < (nvecs1-nmembers1));
+
+		} else {
+
+			j = 0;
+			(*ordhead) = (int *)malloc( sizeof(int)*(nvecs2-nmembers2) );
+			do {
+				(*ordhead)[j] = -1;
+				for( i=0; i< (nvecs1-nmembers1); i++) {
+					if( strncmp(vecs2[j],vecs1[i],strlen(vecs2[j])) == 0)
+						(*ordhead)[j]=i;
+				}
+				j++;
+			}while(j < (nvecs2-nmembers2));
+
+		}
+
+		return 1;
+
+	} else {
+
+	return 0;
+
+	}
+
+}
+
+
+int verify_body(char **vecs1, int nvecs1, int nmembers1, char **vecs2, int nvecs2, int nmembers2, int **ordbody)
+{
+
+	/* at some point create a more rigorous check, i.e. for cases when the
+	 * number of struct members is the same, but the content is not
+	*/
+
+	int off1, off2;
+	int i, j, abundflag = 0;
+
+	off1 = nvecs1 - nmembers1;
+	off2 = nvecs2 - nmembers2;
+
+	if( nmembers1 != nmembers2 ) {
+
+		abundflag = 1;
+
+		printf("different content in structs! %d vs %d\n\n", nvecs1, nvecs2);
+		for(i=0; i< (nmembers1 > nmembers2 ? nmembers1 : nmembers2); i++)
+			printf("%s   %s\n",vecs1[off1+i], vecs2[off2+i]);
+/*
+*/
+	}
+
+/*
+		if( nmembers1 > nmembers2 ){
+*/
+
+			j = 0;
+			(*ordbody) = (int *)malloc( sizeof(int)*nmembers1 );
+			do {
+				(*ordbody)[j] = -1;
+				for( i=0; i< nmembers2; i++) {
+					if( strncmp( vecs1[off1+j],vecs2[off2+i],
+								strlen(vecs1[off1+j]) ) == 0)
+						(*ordbody)[off2+i]=off1+j;
+				}
+				j++;
+			}while(j < nmembers1) ;
+
+/*
+		} else {
+
+			j = 0;
+			(*ordbody) = (int *)malloc( sizeof(int)*nmembers2 );
+			do {
+				(*ordbody)[j] = -1;
+				for( i=0; i< nmembers1; i++) {
+					if( strncmp( vecs2[off2+j],vecs1[off1+i],
+								strlen(vecs2[off2+j]) ) == 0)
+						(*ordbody)[off1+i]=off2+j;
+				}
+				j++;
+			}while(j < nmembers2) ;
+*/
+
+/*
+		}
+*/
+
+		return 1;
+
+/*
+	} else {
+
+		return 0;
+
+	}
+*/
+
+}
+
+
+int verify_abun(int abarr1[][22], int abarr2[][22], int nmembers)
+{
+	int i, k, abundflag = 0;
+
+
+		for( i = 0; i < nmembers; i++ ) {
+			if( (abarr1[0][i] != abarr2[0][i]) || (abarr1[1][i] != abarr2[1][i]) )
+				abundflag = 1;
+		}
+
+        /* check if the abundance information is the same in both files, and spit
+         * out a warning if it is not */
+        if(abundflag == 1) {
+           printf("warning: abundance info in files might not be the same!\n");
+           printf("%10s %10s\n%5s%5s %5s%5s\n", "file1", "file2","p","n","p","n");
+           for(k=0;k<22;k++) printf("%5d%5d %5d%5d\n",
+               abarr1[0][k],abarr1[1][k],abarr2[0][k],abarr2[1][k]);
+    }
+
+	return 0;
+
+}
+
+
+
+
+int prep_SDF_args(SDF *sdfp, char **vecs, int nvecs, char ***members, int *nmembers, SDF_type_t **types, int **offsets, int **strides, int **lines, size_t *stride)
+{
+
+	int i, incr=1, flag = 0, idindex = 0;
+
+        for (i = 0, *stride = 0, *nmembers = 0; i < nvecs; ++i) {
+
+            if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag=1;
+
+            if(flag) {
+                (*members)[*nmembers] = vecs[i];
+                (*types)[*nmembers] = SDFtype((*members)[*nmembers], sdfp);
+                (*offsets)[*nmembers] = *stride;
+                *stride += SDFtype_sizes[(*types)[*nmembers]];
+                (*lines)[*nmembers] = incr;
+                (*nmembers)++;
+            }
+
+            /* get index that holds 'ident' for later updating */
+            if (strncmp(vecs[i], "ident", strlen(vecs[i])) == 0)
+				idindex = *nmembers - 1;
+
+        }
+        for (i = 0; i < *nmembers; i++)
+            (*strides)[i] = *stride;
+		printf("stride = %d\n",(int)(*stride));
+
+	return idindex;
 }
