@@ -8,10 +8,8 @@ LDLIBS = -lsw
 #PROGS = todoublepos
 #PROGS= readsection2
 #PROGS= readsection3
-#PROGS= addabundance2
-#PROGS= addabundance2v3
-#PROGS= addabundance2new
-PROGS = mergeSDFs2
+PROGS= addabundance2v3
+#PROGS = mergeSDFs2
 #PROGS = maketraj2
 #PROGS = addvel2
 
@@ -22,10 +20,8 @@ all: $(PROGS)
 #todoublepos: todoublepos.o
 #readsection2: readsection2.o
 #readsection3: readsection3.o
-#addabundance2: addabundance2.o
-#addabundance2v3: addabundance2v3.o
-#addabundance2new: addabundance2new.o
-mergeSDFs2: mergeSDFs2.o
+addabundance2v3: addabundance2v3.o
+#mergeSDFs2: mergeSDFs2.o
 #maketraj2: maketraj2.o
 #addvel2: addvel2.o
 
