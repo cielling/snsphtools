@@ -321,10 +321,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
     if (!afp) printf("error opening file c16r4_abun.dat\n");
 
     /*read in first number, that's the number of isotopes in the file*/
-    fscanf(afp, "%3d", &numA);
+    fscanf(afp, "%d", &numA);
 
     /*read in second number, that's the number of lines in the file*/
-    fscanf(afp, "%3d", &Nbins);
+    fscanf(afp, "%d", &Nbins);
 
     nparr = (int *)malloc(numA * sizeof(int));
     nnarr = (int *)malloc(numA * sizeof(int));
