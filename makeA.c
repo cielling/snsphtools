@@ -1,11 +1,20 @@
 #include<stdlib.h>
 #include<stdio.h>
+#include<string.h>
 
-int main(void) {
+int main(int argc, char *argv[]) {
     FILE *fp;
     int *nparr, *nnarr;
-    float *radbin, **abundarr;
+    float *radbin, **abundarr, sumX = 0.0;
     int i, j, numA, Nbins;
+    int calc_he;
+
+    if(argc != 2)
+       printf("Error, need value for calc_He_flag!\n");
+
+    calc_he = atoi(argv[1]);
+
+    if(calc_he) printf("calculating He abundance\n");
 
     /* now need to read in the abundances, and other necessary stuff */
 
@@ -59,8 +68,15 @@ int main(void) {
 
     /*read in abundances, one set for each radial bin*/
     for (i=0; i< Nbins; i++){
+        sumX = 0.0;
         for (j=0; j < numA; j++) {
             fscanf(fp, "%12G", &abundarr[i][j]);
+            if (calc_he)
+                sumX += abundarr[i][j]; /* add ALL X_i, incl. He */
+        }
+        if(calc_he) {
+            sumX -= abundarr[i][numA-1]; /* subtract wrong X(He) */
+            abundarr[i][numA-1] = ( (1.0 -sumX) < 0.0 ? 0.0 : (1.0-sumX) );
         }
     }
 
