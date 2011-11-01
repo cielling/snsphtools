@@ -1,6 +1,6 @@
 # Try "make CC-icc ARCH=[your usual ARCH value]"
 
-CPPFLAGS = -I$(TREEHOME)/include -wd1338,810,592,593
+CPPFLAGS = -I$(TREEHOME)/include -wd1338,810,592,593,1419
 CFLAGS = -g -O0 -Wall -D_FILE_OFFSET_BITS=64
 LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
 LDLIBS = -lsw
@@ -9,11 +9,11 @@ LDLIBS = -lsw
 #PROGS= readsection2
 #PROGS= readsection3
 #PROGS= addabundance2
-#PROGS= addabundance2v3
+PROGS= addabundance2v3
 #PROGS= addabundance2new
 #PROGS = mergeSDFs2
 #PROGS = maketraj2
-PROGS = addvel2
+#PROGS = addvel
 
 .PHONY: all clean
 
@@ -23,11 +23,11 @@ all: $(PROGS)
 #readsection2: readsection2.o
 #readsection3: readsection3.o
 #addabundance2: addabundance2.o
-#addabundance2v3: addabundance2v3.o
+addabundance2v3: addabundance2v3.o
 #addabundance2new: addabundance2new.o
 #mergeSDFs2: mergeSDFs2.o
 #maketraj2: maketraj2.o
-addvel2: addvel2.o
+#addvel: addvel.o
 
 clean:
 	-$(RM) $(PROGS) *.o *~

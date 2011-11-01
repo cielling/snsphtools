@@ -97,23 +97,33 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *outbtab, *btab;
     void **addrs;
     int *inoffsets, *lines, *strides, *starts;
-    int INCR=1, flag=0, num=7;
+    int INCR=1, flag=0, num=6;
     int nlines = 1, nrecs;
     int index[num];
     double x, y, z;
-    float rho;
+    float rho,mass,h,masscf,lengthcf,timecf;
     /*make INCR and nlines user input */
 
-/* this does not attempt to load the whole file into memory, does it? -CE */
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
 
     SDFgetint(sdfp, "npart", &nrecs);
+    /*
+    SDFgetint(sdfp, "massCF", &masscf);
+    SDFgetint(sdfp, "timeCF", &timecf);
+    SDFgetint(sdfp, "lengthCF", &lengthcf);
+    */
+    masscf = 1.998e27;
+    lengthcf = 6.955e10;
+    timecf = 1.e2;
+
+    printf("length= %e, mass= %e, time= %e\n",
+		lengthcf, masscf, timecf);
 
     /* Count structure members */
     /* don't use SDFnrecs, since that reads in the entire file which I'm trying to
        avoid. But I know that the structure (so far) always has "x" as the first
-       member, so I can start counting from there -CE */
+       member, so I can start counting from there -CIE */
     for (i = 0, nmembers = 0; i < nvecs; ++i) {
         /*get columns of interest*/
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) {
@@ -121,19 +131,26 @@ static void writestructs(SDF *sdfp, FILE *fp)
             index[0]=i;
             flag=1;
         }
+		/* change the read in quantities here */
+		/* if you change the number of quantities read in, change
+		   'num' in the variable declarations also */
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f4", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f3", strlen(vecs[i])) == 0) index[6]=i;
+        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[5]=i;
+
 /*
-        if (strncmp(vecs[i], "f1", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[6]=i;
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f17", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[5]=i;
         if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
+
+        if (strncmp(vecs[i], "f1", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
+
 
         if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[4]=i;
@@ -141,8 +158,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[6]=i;
 
         if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[5]=i;
-*/
-/*
+
         if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[5]=i;
@@ -151,7 +167,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     }
     printf("nmembers = %d\n",nmembers);
 
-/*malloc memory space for the respective features of the struct-CE*/
+/*malloc memory space for the respective features of the struct-CIE*/
     members = (char **)malloc(num * sizeof(char *));
     addrs = (void **)malloc(num * sizeof(void *));
     types = (SDF_type_t *)malloc(num * sizeof(SDF_type_t));
@@ -160,24 +176,25 @@ static void writestructs(SDF *sdfp, FILE *fp)
     lines = (int * )malloc(num * sizeof(int));
     starts = (int * )malloc(num * sizeof(int));
 
-/*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
+/*one by one, go through the fields in the column, i.e. members of the struct?-CIE*/
     for (i = 0, stride = 0; i < num; ++i) {
-	    members[i] = vecs[index[i]];
-	    types[i] = SDFtype(members[i], sdfp);
+	    members[i] = vecs[index[i]];	/* quantities of interest */
+	    types[i] = SDFtype(members[i], sdfp);	/* their data types */
 	    inoffsets[i] = stride;/* offsets (from beginning of 'line'?) of each column
                                             of data (struct member) */
-	    stride += SDFtype_sizes[types[i]];
-            lines[i] = nlines;
-            printf("member = %s offset: %d\n",members[i],inoffsets[i]);
+	    stride += SDFtype_sizes[types[i]];	/* strides in memory */
+        lines[i] = nlines;
+        printf("member = %s offset: %d\n",members[i],inoffsets[i]);
 	}
 
-    /* unnecesary, just use 'stride' ? CE */
+    /* unnecesary, just use 'stride' ? CIE */
     outstride = 0;
     for( i = 0; i < num; i++) outstride += SDFtype_sizes[ types[i] ];
 
+	/* make room for btab to hold the read in data */
     btab = (void *)malloc(stride * nlines);
 
-    /*calculate the byte offset in memory to the address of the next member-CE*/
+    /*calculate the byte offset in memory to the address of the next member-CIE*/
 	addrs[0] = (char *)btab;
     strides[0] = outstride;		/* how did this run correctly without this line??? */
 	for ( i = 1; i < num; i++) {
@@ -199,21 +216,48 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         SDFseekrdvecsarr(sdfp, num, members, starts, lines, addrs, strides);
 
-        /* calculate radius for merging */
+        /* calculate quantities to apply threshold, if any */
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
         rho = *((float *)(btab + inoffsets[4]));
+        mass = *((float *)(btab + inoffsets[3]));
+        h = *((float *)(btab + inoffsets[5]));
 
+	/*convert to cgs*/
+	x = x*lengthcf;
+	y = y*lengthcf;
+	z = z*lengthcf;
+	rho = rho*masscf/(lengthcf*lengthcf*lengthcf);
+	mass = mass*masscf;
+	h = h*lengthcf;
+
+
+	/*copy back to btab*/
+	memcpy( btab+inoffsets[0], &x, sizeof(x));
+	memcpy( btab+inoffsets[1], &y, sizeof(y));
+	memcpy( btab+inoffsets[2], &z, sizeof(z));
+	memcpy( btab+inoffsets[3], &mass, sizeof(mass));
+	memcpy( btab+inoffsets[4], &rho, sizeof(rho));
+	memcpy( btab+inoffsets[5], &h, sizeof(h));
+	/*
+	*/
 /*
+		At this point different thresholds can be set for
+		selecting particles, e.g.:
         if((x >= 0.0) && (y >= 0.0) && (z >= 0.0)) {
 */
-        if( rho >= 4.0e-7) {
+        if( rho >= 0.0e-0) {
             for( k = 0; k < num; k++) {
+
+				/* calculate log abundances if flag is set */
                 if(logg && (k>2)){
-                *((float *)(btab + inoffsets[k])) = log10(*((float *)(btab + inoffsets[k]))+1.e-20);
+                *((float *)(btab + inoffsets[k])) =
+			log10(*((float *)(btab + inoffsets[k]))+1.e-20);
                 }
+
                 type = SDFtype(members[k], sdfp);
+
                 switch(type) {
                 case SDF_FLOAT:
                     fprintf(fp, "%+13E\t", *(float *)(btab + inoffsets[k]));
@@ -228,8 +272,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
             }
 
             fprintf(fp,"\n");
-/*
-*/
         }
 
     }
