@@ -133,14 +133,14 @@ static void writescalars(SDF *sdfp, FILE *fp)
         nflag = 0;
         if (strncmp(vecs[i], "npart", strlen(vecs[i])) == 0) nflag = 1;
 
-		type = SDFtype(vecs[i], sdfp);
+        type = SDFtype(vecs[i], sdfp);
 		/* Doesn't handle string */
 		/* Also, SDFgetfloat was happy to read a double scalar and
 	   convert it for me; that probably works backwards too.  I
 	   don't think there's an equivalent for the SDFrdvecs family
 	   though, so "read; convert type; write" is the general
 	   path. */
-		/*read in header file, line by line, with the appropriate function-CIE*/
+           /*read in header file, line by line, with the appropriate function-CIE*/
 		switch (type) {
 			case SDF_INT:
 			/*SDFget*:sdfp=sdf file; vecs[i]= variable name; datum.*=holds value of that variable-CIE*/
@@ -279,43 +279,43 @@ static void writestructs(SDF *sdfp, FILE *fp)
 		     strides);
 
     if( j == 0) {
-		for( i = 0; i < n_iso; i++) {
-			parr[i] = *(int *)(btab + inoffsets[ nmembers - 2*n_iso + i ]);
-			narr[i] = *(int *)(btab + inoffsets[ nmembers - 1*n_iso + i ]);
-			fprintf(fp, "int %s = %d;\n", pnames[i], parr[i]);
-			fprintf(fp, "int %s = %d;\n", nnames[i], narr[i]);
-			printf("%s  int %s = %d;\n", members[nmembers-2*n_iso+i],pnames[i], parr[i]);
-			printf("%s  int %s = %d;\n", members[nmembers-1*n_iso+i],nnames[i], narr[i]);
-		}
+         for( i = 0; i < n_iso; i++) {
+             parr[i] = *(int *)(btab + inoffsets[ nmembers - 2*n_iso + i ]);
+             narr[i] = *(int *)(btab + inoffsets[ nmembers - 1*n_iso + i ]);
+             fprintf(fp, "int %s = %d;\n", pnames[i], parr[i]);
+             fprintf(fp, "int %s = %d;\n", nnames[i], narr[i]);
+             printf("%s  int %s = %d;\n", members[nmembers-2*n_iso+i],pnames[i], parr[i]);
+             printf("%s  int %s = %d;\n", members[nmembers-1*n_iso+i],nnames[i], narr[i]);
+        }
 
-		/*print the struct declaration part from the header-CIE*/
-		fprintf(fp, "struct {\n");
-		for (i = 0; i < noutmembers; ++i) {
-			switch (types[i]) {
-			case SDF_INT:
-				fprintf(fp, "\tint %s;\n", outmembers[i]);
-				printf("\tint %s;\n", outmembers[i]);
-				break;
-			case SDF_FLOAT:
-				fprintf(fp, "\tfloat %s;\n", outmembers[i]);
-				printf("\tfloat %s;\n", outmembers[i]);
-				break;
-			case SDF_DOUBLE:
-				fprintf(fp, "\tdouble %s;\n", outmembers[i]);
-				printf("\tdouble %s;\n", outmembers[i]);
-				break;
-			default:
-				fprintf(stderr, "%s: type not supported for member %d\n", outmembers[i], i);
-				exit(-1);
-			}
-		}
-		/*print the struct declaration part from the header-CE*/
-		fprintf(fp, "}[%d];\n", nlines);
-		fprintf(fp, "#\n");
-		fprintf(fp, "# SDF-EOH\n");
-
-	    printf("made p/n specifier\n");
+        /*print the struct declaration part from the header-CIE*/
+        fprintf(fp, "struct {\n");
+        for (i = 0; i < noutmembers; ++i) {
+            switch (types[i]) {
+                case SDF_INT:
+                    fprintf(fp, "\tint %s;\n", outmembers[i]);
+	            printf("\tint %s;\n", outmembers[i]);
+	            break;
+	        case SDF_FLOAT:
+                    fprintf(fp, "\tfloat %s;\n", outmembers[i]);
+                    printf("\tfloat %s;\n", outmembers[i]);
+	            break;
+	        case SDF_DOUBLE:
+	            fprintf(fp, "\tdouble %s;\n", outmembers[i]);
+	            printf("\tdouble %s;\n", outmembers[i]);
+	            break;
+	        default:
+	            fprintf(stderr, "%s: type not supported for member %d\n", outmembers[i], i);
+	            exit(-1);
+            }
 	}
+        /*print the struct declaration part from the header-CE*/
+        fprintf(fp, "}[%d];\n", nlines);
+        fprintf(fp, "#\n");
+        fprintf(fp, "# SDF-EOH\n");
+
+	printf("made p/n specifier\n");
+        }
 
         for( k = 0; k < noutmembers; k++) {
             memcpy(outbtab + outoffsets[k], btab+inoffsets[k],
@@ -336,7 +336,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	}
     for (i = 0; i < noutmembers; i++) {
 		free(outmembers[i]);
-	}
+        }
 */
     printf("something doesnt wanna be free'd ....\n");
     free(members);

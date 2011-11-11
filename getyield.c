@@ -160,7 +160,11 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
 		fscanf(fp, "%s %d %*s %*s %*e", temp, &((*partid)[i]));
 		if( strncmp(temp, "nn", strlen(temp)) == 0)
 			break;
+<<<<<<< HEAD
 	}
+=======
+        }
+>>>>>>> snsphtools-share/master
 	fgets(line, 100, fp);
 
 	/* for now, just assume that we never want to get the yield of n=1,p=1 */
@@ -237,14 +241,23 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     }
     printf("nmembers = %d\n",nmembers);
 
+<<<<<<< HEAD
 	n_iso = index[3]-index[2];
 	//n_iso = 20;
+=======
+	//n_iso = index[3]-index[2];
+	n_iso = 20;
+>>>>>>> snsphtools-share/master
 	printf("%d\n", n_iso);
 	iso_arr = (int**)malloc( 2*sizeof(int *) );
 	iso_arr[0] = (int *)malloc( n_iso*sizeof(int) );
 	iso_arr[1] = (int *)malloc( n_iso*sizeof(int) );
 
+<<<<<<< HEAD
     make_spec_names(&nnames, 'm', n_iso);
+=======
+    make_spec_names(&nnames, 'n', n_iso);
+>>>>>>> snsphtools-share/master
     make_spec_names(&pnames, 'p', n_iso);
 	printf("WARNING: make sure you've got 'm' vs 'n' and n_iso correct!\n");
 
@@ -286,7 +299,11 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
 		for(k = 0; k < n_iso; k++) {
 			/* find isotope */
+<<<<<<< HEAD
 				if( (iso_arr[0][k] == isotop[0][ii]) &&
+=======
+			if( (iso_arr[0][k] == isotop[0][ii]) &&
+>>>>>>> snsphtools-share/master
 				(iso_arr[1][k] == isotop[1][ii]) ) {
 				gotcha[counti++] = k + index[2];
 				break;
@@ -331,7 +348,11 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     flag = 0;
     for (i = 0, stride = 0, j = 0; i < nvecs; ++i) {
+<<<<<<< HEAD
 		if(i == index[1]) {
+=======
+            if(i == index[1]) {
+>>>>>>> snsphtools-share/master
 			/* get mass */
 			members[0] = vecs[i];
             lines[0] = 1;//INCR;
@@ -389,6 +410,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
 	ii = 0;
 
+<<<<<<< HEAD
 		/*try reading in one line at a time */
 		for( j = 0; j < nrecs; j++) {
 			for( i = 0; i < nmembers; i++)
@@ -402,6 +424,21 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 			ident = *((int *)(btab + inoffsets[counti+1]));
 			rho = *((float *)(btab + inoffsets[counti+2]));
 			if(!(j%50000)) printf("rho: %e\n",rho);
+=======
+        /*try reading in one line at a time */
+        for( j = 0; j < nrecs; j++) {
+                for( i = 0; i < nmembers; i++)
+                starts[i] = j;
+
+		if(!(j%50000)) printf("iter: %d\n",j);
+                SDFseekrdvecsarr(sdfp, nmembers, members, starts, lines, addrs, strides);
+			/*temporary solution*/
+
+                mass = *((float *)(btab + inoffsets[0]));
+                ident = *((int *)(btab + inoffsets[counti+1]));
+                rho = *((float *)(btab + inoffsets[counti+2]));
+                if(!(j%50000)) printf("rho: %e\n",rho);
+>>>>>>> snsphtools-share/master
 
 			postprocd = 0; /* only add abundances of non-post proc'd particles */
 
@@ -416,10 +453,17 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
 			if( postprocd==0 ) {
 				for(k = 0; k< counti; k++) {
+<<<<<<< HEAD
 					Xel[k] = *((float *)(btab + (k+1)*sizeof(float) ));
 						if( rho >= 5.0e-3) {
 						yield[k] += Xel[k] * mass * massCF;
                     }
+=======
+                                Xel[k] = *((float *)(btab + (k+1)*sizeof(float) ));
+                                if( rho >= 5.0e-3) {
+					yield[k] += Xel[k] * mass * massCF;
+                                }
+>>>>>>> snsphtools-share/master
 				}
 			}
 
