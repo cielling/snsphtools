@@ -237,14 +237,14 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     }
     printf("nmembers = %d\n",nmembers);
 
-	n_iso = index[3]-index[2];
-	//n_iso = 20;
+	//n_iso = index[3]-index[2];
+	n_iso = 20;
 	printf("%d\n", n_iso);
 	iso_arr = (int**)malloc( 2*sizeof(int *) );
 	iso_arr[0] = (int *)malloc( n_iso*sizeof(int) );
 	iso_arr[1] = (int *)malloc( n_iso*sizeof(int) );
 
-    make_spec_names(&nnames, 'm', n_iso);
+    make_spec_names(&nnames, 'n', n_iso);
     make_spec_names(&pnames, 'p', n_iso);
 	printf("WARNING: make sure you've got 'm' vs 'n' and n_iso correct!\n");
 

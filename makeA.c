@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
     for( i = 0; i < Nbins; i++ ) {
         fprintf(fp, "%12.6E ", radbin[i]);
         for( j = 0; j < numA; j++){
-            if(nparr[j] == nnarr[j])
+    /*        if(nparr[j] == nnarr[j])*/
             fprintf(fp, "%12.6E ", abundarr[i][j]);
         }
         fprintf(fp, "\n");
