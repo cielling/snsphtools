@@ -3,14 +3,14 @@
 CPPFLAGS = -I$(TREEHOME)/include -wd1338,810
 CFLAGS = -g -O0 -Wall -D_FILE_OFFSET_BITS=64
 LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
-LDLIBS = -lsw
+LDLIBS = -lsw -lm
 
 #PROGS = zonetopartid
-PROGS= readsection3
+#PROGS= readsection3
 #PROGS= addabundance
 #PROGS= mergeSDFs2
 #PROGS= SDFtoASCII-batch
-#PROGS= SDFtoASCII
+PROGS= SDFtoASCII
 #PROGS= maketraj
 #PROGS= readanSDF
 #PROGS= convertff
@@ -22,11 +22,11 @@ PROGS= readsection3
 all: $(PROGS)
 
 #zonetopartid: zonetopartid.o
-readsection3: readsection3.o
+#readsection3: readsection3.o
 #addabundance: addabundance.o
 #mergeSDFs2: mergeSDFs2.o
 #SDFtoASCII-batch: SDFtoASCII-batch.o
-#SDFtoASCII: SDFtoASCII.o
+SDFtoASCII: SDFtoASCII.o
 #maketraj: maketraj.o
 #readanSDF: readanSDF.o
 #convertff: convertff.o

@@ -3,7 +3,7 @@
 CPPFLAGS = -I$(TREEHOME)/include -wd1338,810,592,593,1419
 CFLAGS = -g -O0 -Wall -D_FILE_OFFSET_BITS=64
 LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
-LDLIBS = -lsw
+LDLIBS = -lsw -lm
 
 #PROGS = todoublepos
 #PROGS= readsection2

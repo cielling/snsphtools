@@ -97,7 +97,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *outbtab, *btab;
     void **addrs;
     int *inoffsets, *lines, *strides, *starts;
-    int INCR=1, flag=0, num=6;
+    int INCR=1, flag=0, num=7;
     int nlines = 1, nrecs;
     int index[num];
     double x, y, z;
@@ -136,9 +136,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
 		   'num' in the variable declarations also */
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
+        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f4", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
 
 /*
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;

@@ -43,6 +43,7 @@
 #include <errno.h>
 #include <math.h>
 #include <SDF.h>
+#include "consts.h"
 
 
 typedef enum SDF_type_enum SDF_type_t;
@@ -59,7 +60,7 @@ static void writescalars(SDF *sdfp, FILE *fp);
 static void writestructs(SDF *sdfp, FILE *fp);
 
 int NNW;
-int NISO;
+int NNW;
 
 /*void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);*/
 void renorm(int **want, float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
@@ -187,7 +188,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     FILE *afp = NULL, *frp = NULL;
     int i, j, k, nvecs, nmembers, Amembers, ju, jm, jl;
     int numA, Nbins, counter, flag = 0;
-    int nrecs = 0;
+    int nrecs = 0, calc_u = 1, irho, iu, itemp;
     int *strides, *nobjs, *starts, *inoffsets, *outoffsets, *nparr, *nnarr;
     int **nwlist;
     char tmpchr[40], **names;
@@ -198,13 +199,16 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *btab, *outbtab;
     void **addrs;
     float **abundarr; /*should this be void * ? */
-    float *newabund;
-    float *radbin;
-    float tmpval1, tmpval2;
+    float *newabund, *radbin;
+    float u_tot;
+    double kb, arad, rho, temp, eos_n;
     double x, y, z, radius;
 
     frp = fopen("log.out","w");
     if(!frp) printf("error opening log file!\n");
+
+    kb=K_BOLTZ *(timeCF*timeCF)/(massCF *lengthCF*lengthCF);
+    arad=A_COEFF*(lengthCF*timeCF*timeCF/massCF);
 
     SDFgetint(sdfp, "npart", &nrecs);
     printf("%d particles\n", nrecs);
@@ -241,25 +245,28 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fclose(afp);
     afp = NULL;
 
-    NISO = NNW;
-    Amembers = 1*NISO;
+    //NNW = NNW;
+    Amembers = 1*NNW;
 
     /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc(nmembers * sizeof(char *));
-    outmembers = (char **)malloc(1 * NISO * sizeof(char *));
-    for(j=0;j<1*NISO;j++) outmembers[j] = (char *)malloc(10 * sizeof(char));
+    outmembers = (char **)malloc(1 * NNW * sizeof(char *));
+    for(j=0;j<1*NNW;j++) outmembers[j] = (char *)malloc(10 * sizeof(char));
     addrs = (void **)malloc(nmembers * sizeof(void *));
     strides = (int *)malloc(nmembers * sizeof(int));
     nobjs = (int *)malloc(nmembers * sizeof(int));
     starts = (int *)malloc(nmembers * sizeof(int));
     types = (SDF_type_t *)malloc(nmembers * sizeof(SDF_type_t));
-    outtypes = (SDF_type_t *)malloc(1 * NISO * sizeof(SDF_type_t));
+    outtypes = (SDF_type_t *)malloc(1 * NNW * sizeof(SDF_type_t));
     inoffsets = (int *)malloc(nmembers * sizeof(int));
     outoffsets = (int *)malloc(Amembers * sizeof(int));
 
     /*one by one, go through all the fields in the column, i.e. members of the struct?-CE*/
     flag = 0;
     for (i = 0, nmembers = 0, stride = 0; i < nvecs; ++i) {
+        if( strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) irho=i;
+        if( strncmp(vecs[i], "u", strlen(vecs[i])) == 0) iu=i;
+        if( strncmp(vecs[i], "temp", strlen(vecs[i])) == 0) itemp=i;
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
 	    if (flag) {
 	        members[nmembers] = vecs[i];
@@ -277,6 +284,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    }
     }
 
+    irho -= (nvecs - nmembers);
+    iu -= (nvecs - nmembers);
+    itemp -= (nvecs - nmembers);
+
     btab = (void *)malloc(stride);
 
     /*calculate the byte offset in memory to the address of the next member-CIE*/
@@ -288,13 +299,14 @@ static void writestructs(SDF *sdfp, FILE *fp)
 /* up to here just the SDF file is read in, so everything stays the same -CIE */
 
 /*
-    fnames = make_spec_names('f', NISO);
-    pnames = make_spec_names('p', NISO);
-    nnames = make_spec_names('n', NISO);
+    fnames = make_spec_names('f', NNW);
+    pnames = make_spec_names('p', NNW);
+    nnames = make_spec_names('n', NNW);
 */
-    make_spec_names(&fnames, 'f', NISO);
-    make_spec_names(&pnames, 'p', NISO);
-    make_spec_names(&nnames, 'n', NISO);
+    /* what to call mass fraction, Z and N of isotope */
+    make_spec_names(&fnames, 'f', NNW);
+    make_spec_names(&pnames, 'p', NNW);
+    make_spec_names(&nnames, 'n', NNW);
 
     outstride = stride;
 
@@ -317,8 +329,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
 /*
     afp = fopen("c16r4_abun.dat", "r");
 */
-    afp = fopen("run3g_50_abun.dat", "r");
-    if (!afp) printf("error opening file c16r4_abun.dat\n");
+    afp = fopen("abund.txt", "r");
+    if (!afp) printf("error opening file abund.txt\n");
 
     /*read in first number, that's the number of isotopes in the file*/
     fscanf(afp, "%d", &numA);
@@ -347,7 +359,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (!abundarr[i]) printf("error allocating abundarr[i]\n");
     }
 
-    newabund = (float *)malloc(NISO * sizeof( float ));
+    newabund = (float *)malloc(NNW * sizeof( float ));
     if (!newabund) printf("error allocating newabund\n");
 
     /* read in radial bins into radbin */
@@ -367,7 +379,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
 
     /* print Z and N of isotopes of choice */
-    for( i = 0; i < NISO; i++ ) {
+    for( i = 0; i < NNW; i++ ) {
         fprintf(fp, "int %s = %d;\n", pnames[i], nwlist[0][i]);
         fprintf(fp, "int %s = %d;\n", nnames[i], nwlist[1][i]);
     }
@@ -421,6 +433,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
         radius = sqrt( x*x + y*y + z*z );
+        rho = *(float *)(btab + inoffsets[irho]);
+        temp = *(float *)(btab + inoffsets[itemp]);
 
         /*quick bisection to locate the radial bin I'm in -CE */
         if (radius >= radbin[Nbins-1])
@@ -465,6 +479,22 @@ static void writestructs(SDF *sdfp, FILE *fp)
                 }
             }
         }
+
+
+        /* lastly, determine u from T */
+        if(calc_u) {
+            eos_n = 0.0;
+            for( i = 0; i < numA; i++) {
+                eos_n += ((double)rho)*N_AVOG * massCF /(double)(nparr[i] + nnarr[i]) *
+                     (double)abundarr[jl][i];
+                     // * (double)(nparr[j] + 1.0);/* accounts for electrons!*/
+            }
+            u_tot = (float)(1.5 * eos_n * kb * temp + 
+                    arad * temp * temp * temp * temp); 
+            u_tot = (float)((double)u_tot/rho); /* need specific internal energy */
+            memcpy(outbtab + inoffsets[ iu ], &u_tot, SDFtype_sizes[ types[ iu ]]);
+        }
+
 
         /*dump the outbtab data into the file now-CE*/
         fwrite(outbtab, outstride, 1, fp);
