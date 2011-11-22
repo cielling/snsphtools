@@ -62,6 +62,8 @@ static void writestructs(SDF *sdfp, FILE *fp);
 int NNW;
 int NNW;
 
+int calc_u;
+
 /*void renorm(int want[][NNW], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);*/
 void renorm(int **want, float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
 
@@ -91,8 +93,8 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 {
     char input;
 
-    if (argc != 3) {
-	fprintf(stderr, "Usage: %s SDFfile outfile\n", argv[0]);
+    if (argc != 4) {
+	fprintf(stderr, "Usage: %s SDFfile outfile calc_u_flag\n", argv[0]);
 	exit(1);
     }
 
@@ -114,6 +116,10 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 	fprintf(stderr, "%s: %s\n", argv[2], strerror(errno));
 	exit(errno);
     }
+
+    calc_u = atoi(argv[3]);
+    if(calc_u) printf("calculating u from T\n");
+    else printf("leaving u unchanged\n");
 }
 
 static void writeinit(FILE *fp)
@@ -188,7 +194,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     FILE *afp = NULL, *frp = NULL;
     int i, j, k, nvecs, nmembers, Amembers, ju, jm, jl;
     int numA, Nbins, counter, flag = 0;
-    int nrecs = 0, calc_u = 1, irho, iu, itemp;
+    int nrecs = 0, irho, iu, itemp;
     int *strides, *nobjs, *starts, *inoffsets, *outoffsets, *nparr, *nnarr;
     int **nwlist;
     char tmpchr[40], **names;
