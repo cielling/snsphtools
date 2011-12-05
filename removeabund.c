@@ -6,8 +6,6 @@
 
    NOTE:
     - assumes that the abundances are the last members in the SPHbody struct.
-    - does not remove abundance info from header yet, which can/ has to be done
-      manually
 
    COMPILE:
     with Makefile2. un-comment appropriate lines.
@@ -23,9 +21,6 @@
     @ determine where the abundance information starts
 	@ read in data line-by-line, omitting the abundances
 	@ write data to <out-file.sdf>
-
-   TO DO:
-    - remove abundance info from header
 
 */
 
@@ -130,6 +125,10 @@ static void writescalars(SDF *sdfp, FILE *fp)
 	   don't think there's an equivalent for the SDFrdvecs family
 	   though, so "read; convert type; write" is the general
 	   path. */
+
+    /* bail if we've reached abundance info */
+    if (strncmp(vecs[i], "p1", strlen(vecs[i])) == 0) break;
+
     /*read in header file, line by line, with the appropriate function-CIE*/
 	switch (type) {
 	case SDF_INT:
