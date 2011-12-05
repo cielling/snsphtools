@@ -1,0 +1,12 @@
+#ignore the output dir
+output/
+#ignore objects, archives, and executables
+*.[oae]
+#ignore some .dat, .txt, and .out I/O files
+*.dat
+*.txt
+*.out
+#ignore tarballs
+*.tar
+*.tgz
+*.gz
