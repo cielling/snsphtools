@@ -4,8 +4,22 @@
         only a few columns are written to the text file, namely x,y,z,h,mass,rho.
 	One line of the SDF file is read at a time, so this should work for any
 	size SDF file.
-   NOTE: this code assumes that 'npart' from the header contains the total number
-	of particles.
+
+   NOTE:
+    - this code assumes that 'npart' from the header contains the total number
+    of particles.
+    - the physical quantities retrieved from the sdf can be changed (however, 
+    the first always has to be 'x'). If the number of variables retrieved is 
+    changed, also change 'num' to reflect the new value. 
+
+   COMPILE:
+    with Makefile2. un-comment appropriate lines.
+    This routine needs some libraries from the tree code and SDF routines,
+    so make sure that TREEHOME is set, and the tree code (SNSPH) compiled
+    once for serial use (i.e. without PAROS flag).
+
+   RUN:
+    SDFtoASCII <in-file.sdf> <out-file.sdf> log-flag
 
    DONE: 1) get list of names in SDF file
    DONE: 2) read all scalars
@@ -138,7 +152,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
         if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f4", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f17", strlen(vecs[i])) == 0) index[5]=i;
         if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
 
 /*
@@ -226,22 +240,24 @@ static void writestructs(SDF *sdfp, FILE *fp)
         h = *((float *)(btab + inoffsets[5]));
 
 	/*convert to cgs*/
+/*
 	x = x*lengthcf;
 	y = y*lengthcf;
 	z = z*lengthcf;
 	rho = rho*masscf/(lengthcf*lengthcf*lengthcf);
 	mass = mass*masscf;
 	h = h*lengthcf;
+*/
 
 
 	/*copy back to btab*/
+	/*
 	memcpy( btab+inoffsets[0], &x, sizeof(x));
 	memcpy( btab+inoffsets[1], &y, sizeof(y));
 	memcpy( btab+inoffsets[2], &z, sizeof(z));
 	memcpy( btab+inoffsets[3], &mass, sizeof(mass));
 	memcpy( btab+inoffsets[4], &rho, sizeof(rho));
 	memcpy( btab+inoffsets[5], &h, sizeof(h));
-	/*
 	*/
 /*
 		At this point different thresholds can be set for
