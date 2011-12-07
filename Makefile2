@@ -1,7 +1,7 @@
 # Try "make CC-icc ARCH=[your usual ARCH value]"
 
 CPPFLAGS = -I$(TREEHOME)/include -wd1338,810,592,593,1419
-CFLAGS = -g -O0 -Wall -D_FILE_OFFSET_BITS=64
+CFLAGS = -O3 -Wall -D_FILE_OFFSET_BITS=64 -L_LARGEFILE64_SOURCE
 LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
 LDLIBS = -lsw -lm
 
