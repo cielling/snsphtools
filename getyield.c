@@ -1,16 +1,30 @@
 /*
    PURPOSE:
-    to get the yield of a list of isotopes
+    to get the yield of a list of isotopes, and to calculate total, post-processed
+    yields, if present
 
-   NOTE: this code assumes that 'npart' from the header contains the total number
+   NOTE:
+    - this code assumes that 'npart' from the header contains the total number
     of particles.
+    - the <isotopes-file> is just a table with the Z and N of each isotope to
+    get the yields for
+    - the <post-processed-file> is a file with the post-processed yields as
+    currently given by the se_yields code. This is essentially a header that
+    contains information about which particles were post-processed, and the yield
+    for each isotope that was post-processed (I think). To get the un-Burn-ed
+    yields, create a dummy post-processed file with two lines; the first line
+    containing some (non-whitespace) characters, the second line containing just
+    'nn'.
 
-   DONE: 1) get list of names in SDF file
-   DONE: 2) read all scalars
-   DONE: 3) read selected structure members, INCR lines at a time
-   DONE: 4) calculate offsets, write adjusted members into buffer
-   DONE: 5) loop over 3-4 until whole file is read (or seg fault is reached ;-P)
-   DONE: 6) write scalars and buffer to file
+   COMPILE:
+    make ARCH=<arch-value> [CC=<c-compiler>] PROGS=getyield -f Makefile
+
+    - make sure $TREEHOME is set correctly, and that the tree library in that
+    path has been compiled for serial use.
+
+   SYNTAX:
+    getyield <sdf-file> <output-file> <isotopes-file> <post-processed-file>
+
 */
 
 #include <stdio.h>
