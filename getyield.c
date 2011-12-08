@@ -251,19 +251,33 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     }
     printf("nmembers = %d\n",nmembers);
 
-    //n_iso = index[3]-index[2];
-    n_iso = 20;
+    /* check for old file format vs new file format. In the old file
+       format, Z and N of the isotopes was in the body of the data (i.e.
+       members of the SPHbody struct, and followed the mass fraction f.
+       In the new file format, they were added to the header, just before
+       the struct.
+    */
+    if(index[3] > index[2]) { /* old format */
+        n_iso = index[3]-index[2];
+        make_spec_names(&nnames, 'm', n_iso);
+        make_spec_names(&pnames, 'p', n_iso);
+    } else { /* new format */
+        n_iso = (index[0]-index[3])/2;
+        make_spec_names(&nnames, 'n', n_iso);
+        make_spec_names(&pnames, 'p', n_iso);
+    }
+
+    //n_iso = 20;
     printf("%d\n", n_iso);
     iso_arr = (int**)malloc( 2*sizeof(int *) );
     iso_arr[0] = (int *)malloc( n_iso*sizeof(int) );
     iso_arr[1] = (int *)malloc( n_iso*sizeof(int) );
 
-    make_spec_names(&nnames, 'n', n_iso);
-    make_spec_names(&pnames, 'p', n_iso);
     printf("WARNING: make sure you've got 'm' vs 'n' and n_iso correct!\n");
 
     if( SDFgetfloat(sdfp, "massCF", &massCF) != 0) massCF = 1.998e27;
-    massCF = massCF/1.998e33;
+    massCF = massCF/1.9889e33;
+    printf("massCF= %e\n", massCF);
 
     for( i=0; i < n_iso; i++) {
         SDFgetint(sdfp,pnames[i], &iso_arr[0][i]);
@@ -309,14 +323,14 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         ii++;
     }
 
-    //--counti;
+    --counti;
     printf("counti: %d\n",counti);
 
     /* sort */
     if(counti>1) {
 
-    for(i = 0; i < counti; i++) {
-        for(j = 0; j < counti-1; j++ ) {
+    for(i = 0; i <= counti; i++) {
+        for(j = 0; j <= counti-1; j++ ) {
             if(gotcha[j] > gotcha[j+1]) {
                 temp = gotcha[j+1];
                 gotcha[j+1] = gotcha[j];
@@ -327,10 +341,12 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     }
 
-    for( i = 0; i < counti; i++) {
+/*
+    for( i = 0; i <= counti; i++) {
         printf("%d\t",gotcha[i]);
     }
     printf("\n");
+*/
 
 /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc((counti+3) * sizeof(char *));
@@ -355,7 +371,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
             stride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];/*applies to output*/
             printf("member = %s offset: %d \n", members[0],inoffsets[0]);
         }
-        if(i == gotcha[j] && j<counti) {
+        if(i == gotcha[j] && j<=counti) {
             members[j+1] = vecs[i];
             lines[j+1] = 1;//INCR;
             starts[j+1] = 0;
@@ -429,7 +445,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         }
 
         if( postprocd==0 ) {
-            for(k = 0; k< counti; k++) {
+            for(k = 0; k<= counti; k++) {
                 Xel[k] = *((float *)(btab + (k+1)*sizeof(float) ));
                 if( rho >= 5.0e-3) {
                     yield[k] += Xel[k] * mass * massCF;
@@ -443,12 +459,12 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     total = 0;
 
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "total");
-        for(k = 0; k < counti; k++) {
+        for(k = 0; k <= counti; k++) {
             fprintf(fp, "%4d %4d %14.6e", iso_arr[0][ gotcha[k]-index[2] ],
                 iso_arr[1][ gotcha[k]-index[2] ], yield[k]);
             if(!(yield[k]!=yield[k]))
                 total += yield[k];
-            for(ii = 0; ii < counti; ii++) {
+            for(ii = 0; ii <= counti; ii++) {
                 if((iso_arr[0][ gotcha[k]-index[2] ] == isotop[0][ii]) &&
                     (iso_arr[1][ gotcha[k]-index[2] ] == isotop[1][ii]) ) {
                     fprintf(fp, "\t%14.6e\t%14.6e\n", ppyields[ii], (yield[k]+ppyields[ii]));
