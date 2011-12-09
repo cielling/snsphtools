@@ -137,7 +137,7 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
     isotope[0] = (int *)malloc( counti*sizeof(int) );
     isotope[1] = (int *)malloc( counti*sizeof(int) );
 
-    *ppyields = (float *)malloc( counti*sizeof(float) );
+    *ppyields = (float *)calloc( counti,sizeof(float) );
 
 
     counti = 0;
@@ -155,7 +155,7 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
     /* read post-processed particles file */
     fp = fopen(argv[4], "r");
     if(fp == NULL) {
-        printf("error opening file! %s\n",argv[4]);
+        printf("error opening post-processing file! %s\n",argv[4]);
         return 0;
     }
 
