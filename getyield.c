@@ -182,7 +182,7 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
         fscanf(fp, "%*s%*s %d %*s %*s %d %*s %*s %e %*s", &nn, &np,&mass);
         for( j = 0; j < counti; j++) {
             if((nn == isotope[1][j]) && (np == isotope[0][j])) {
-            (*ppyields)[j] = mass/1.99e33;
+            (*ppyields)[j] = mass/1.9889e33;
             }
         }
     }
@@ -208,7 +208,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     char **pnames, **nnames;
     char line[101];
     SDF_type_t *types, type;
-    size_t stride = 0;
+    size_t instride = 0, outstride = 0;
     void *btab;
     void **addrs;
     int *inoffsets, *lines, *strides, *starts;
@@ -275,7 +275,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     printf("WARNING: make sure you've got 'm' vs 'n' and n_iso correct!\n");
 
-    if( SDFgetfloat(sdfp, "massCF", &massCF) != 0) massCF = 1.998e27;
+    if( SDFgetfloat(sdfp, "massCF", &massCF) != 0) massCF = 1.9889e27;
     massCF = massCF/1.9889e33;
     printf("massCF= %e\n", massCF);
 
@@ -291,6 +291,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         fgets(line, 100, fp2);
         counti++;
     }
+    rewind(fp2);
 
     printf("getting %d isotopes\n",--counti);
     //counti = countis+1;
@@ -298,8 +299,6 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     isotop = (int **)malloc( 2*sizeof(int *) );
     isotop[0] = (int *)malloc( counti*sizeof(int) );
     isotop[1] = (int *)malloc( counti*sizeof(int) );
-
-    rewind(fp2);
 
     gotcha = (int *)malloc((counti+2)*sizeof(int));
     Xel = (float *)malloc( counti*sizeof(float) );
@@ -329,8 +328,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     /* sort */
     if(counti>1) {
 
-    for(i = 0; i <= counti; i++) {
-        for(j = 0; j <= counti-1; j++ ) {
+    for(i = 0; i < counti; i++) {
+        for(j = 0; j < counti-1; j++ ) {
             if(gotcha[j] > gotcha[j+1]) {
                 temp = gotcha[j+1];
                 gotcha[j+1] = gotcha[j];
@@ -341,14 +340,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     }
 
-/*
-    for( i = 0; i <= counti; i++) {
-        printf("%d\t",gotcha[i]);
-    }
-    printf("\n");
-*/
 
-/*malloc memory space for the respective features of the struct-CE*/
+    /*malloc memory space for the respective features of the struct-CE*/
     members = (char **)malloc((counti+3) * sizeof(char *));
     addrs = (void **)malloc((counti+3)* sizeof(void *));
     types = (SDF_type_t *)malloc((counti+3) * sizeof(SDF_type_t));
@@ -360,26 +353,40 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
 
     flag = 0;
-    for (i = 0, stride = 0, j = 0; i < nvecs; ++i) {
+    for (i = 0, outstride = 0, j = 0; i < nvecs; ++i) {
         if(i == index[1]) {
             /* get mass */
             members[0] = vecs[i];
             lines[0] = 1;//INCR;
             starts[0] = 0;
             types[0] = SDFtype(members[0], sdfp);
-            inoffsets[0] = stride;
-            stride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];/*applies to output*/
+            inoffsets[0] = outstride;
+            outstride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];/*applies to output*/
             printf("member = %s offset: %d \n", members[0],inoffsets[0]);
-        }
-        if(i == gotcha[j] && j<=counti) {
+        } 
+        if(i == gotcha[j] && j<counti) {
             members[j+1] = vecs[i];
             lines[j+1] = 1;//INCR;
             starts[j+1] = 0;
             types[j+1] = SDFtype(members[j+1], sdfp);
-            inoffsets[j+1] = stride;
-            stride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];
+            inoffsets[j+1] = outstride;
+            outstride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];
             printf("member = %s offset: %d \n",members[j+1],inoffsets[j+1]);
+
+            /* initial yield-array to zero, since it carries a cumulative total */
+            yield[j]=0.;
+
             j++;
+
+        } else if (i >= index[2]) {
+            //outstride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];
+        } 
+        if(i <= index[0]) {
+            /* because SDFseekreadvecsarr wants the strides between successive
+               quantities in the input. If only one lines is read, this does not 
+               really have an effect 
+            */
+            instride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];
         }
     }
 
@@ -388,8 +395,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     lines[counti+1] = 1;//INCR;
     starts[counti+1] = 0;
     types[counti+1] = SDFtype(members[counti+1], sdfp);
-    inoffsets[counti+1] = stride;
-    stride += SDFtype_sizes[ SDFtype(vecs[index[4]],sdfp) ];
+    inoffsets[counti+1] = outstride;
+    outstride += SDFtype_sizes[ SDFtype(vecs[index[4]],sdfp) ];
     printf("member = %s offset: %d \n",members[counti+1],inoffsets[counti+1]);
 
     /* get particle density */
@@ -397,20 +404,20 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     lines[counti+2] = 1;//INCR;
     starts[counti+2] = 0;
     types[counti+2] = SDFtype(members[counti+2], sdfp);
-    inoffsets[counti+2] = stride;
-    stride += SDFtype_sizes[ SDFtype(vecs[index[5]],sdfp) ];
+    inoffsets[counti+2] = outstride;
+    outstride += SDFtype_sizes[ SDFtype(vecs[index[5]],sdfp) ];
     printf("member = %s offset: %d \n",members[counti+2],inoffsets[counti+2]);
 
-    nmembers = j+3;
+    nmembers = counti+3;
 
-    btab = (void *)malloc(stride * nlines);
+    btab = (void *)malloc(outstride * nlines);
 
     /*calculate the byte offset in memory to the address of the next member-CE*/
     addrs[0] = (char *)btab;
-    strides[0] = stride;        /* how did this run correctly without this line??? */
+    strides[0] = instride;        /* how did this run correctly without this line??? */
     for ( i = 1; i < nmembers; i++) {
-            addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
-            strides[i] = stride;
+        addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
+        strides[i] = instride;
     }
 
 
@@ -425,13 +432,13 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
             starts[i] = j;
 
         if(!(j%50000)) printf("iter: %d\n",j);
-            SDFseekrdvecsarr(sdfp, nmembers, members, starts, lines, addrs, strides);
+        SDFseekrdvecsarr(sdfp, nmembers, members, starts, lines, addrs, strides);
             /*temporary solution*/
 
         mass = *((float *)(btab + inoffsets[0]));
         ident = *((int *)(btab + inoffsets[counti+1]));
         rho = *((float *)(btab + inoffsets[counti+2]));
-        if(!(j%50000)) printf("rho: %e\n",rho);
+        //if(!(j%50000)) printf("rho: %d\n",npartids);
 
         postprocd = 0; /* only add abundances of non-post proc'd particles */
 
@@ -445,9 +452,9 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         }
 
         if( postprocd==0 ) {
-            for(k = 0; k<= counti; k++) {
-                Xel[k] = *((float *)(btab + (k+1)*sizeof(float) ));
-                if( rho >= 5.0e-3) {
+            for(k = 0; k< counti; k++) {
+                Xel[k] = *((float *)(btab + inoffsets[k+1]) );
+                if( rho >= 0.0e-0) {
                     yield[k] += Xel[k] * mass * massCF;
                 }
             }
@@ -456,15 +463,15 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     }
 
     printf("got mass?\n");
-    total = 0;
+    total = 0.;
 
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "total");
-        for(k = 0; k <= counti; k++) {
+        for(k = 0; k < counti; k++) {
             fprintf(fp, "%4d %4d %14.6e", iso_arr[0][ gotcha[k]-index[2] ],
                 iso_arr[1][ gotcha[k]-index[2] ], yield[k]);
             if(!(yield[k]!=yield[k]))
                 total += yield[k];
-            for(ii = 0; ii <= counti; ii++) {
+            for(ii = 0; ii < counti; ii++) {
                 if((iso_arr[0][ gotcha[k]-index[2] ] == isotop[0][ii]) &&
                     (iso_arr[1][ gotcha[k]-index[2] ] == isotop[1][ii]) ) {
                     fprintf(fp, "\t%14.6e\t%14.6e\n", ppyields[ii], (yield[k]+ppyields[ii]));
@@ -491,6 +498,9 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     free(yield);
     free(Xel);
     free(gotcha);
+    free(pnames);
+    free(nnames);
+    free(ppyields);
 
 }
 
