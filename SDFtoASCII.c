@@ -1,9 +1,9 @@
 /*
    PURPOSE:
-	to convert SDF files to formatted text files that OpenDX can read.
-        only a few columns are written to the text file, namely x,y,z,h,mass,rho.
-	One line of the SDF file is read at a time, so this should work for any
-	size SDF file.
+    to convert SDF files to formatted text files that OpenDX can read.
+    only a few columns are written to the text file, namely x,y,z,h,mass,rho.
+    One line of the SDF file is read at a time, so this should work for any
+    size SDF file.
 
    NOTE:
     - this code assumes that 'npart' from the header contains the total number
@@ -11,6 +11,12 @@
     - the physical quantities retrieved from the sdf can be changed (however, 
     the first always has to be 'x'). If the number of variables retrieved is 
     changed, also change 'num' to reflect the new value. 
+    - currently, the log-flag options are as follows
+      * 0 = calculates linear abundances (i.e. just gets data from the SDF)
+      * 1 = calculates the log of the abundances (meaning mass fractions)
+      * 2 = converts the units to cgs for everything, but get mass fraction
+      * 3 = calculates the mass density in cgs of the isotopes, leaves x,y,z
+            in code units, though
 
    COMPILE:
     with Makefile2. un-comment appropriate lines.
@@ -70,19 +76,19 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
     char input;
 
     if (argc != 4) {
-	fprintf(stderr, "Usage: %s SDFfile outfile log_flag\n", argv[0]);
-	exit(1);
+        fprintf(stderr, "Usage: %s SDFfile outfile log_flag\n", argv[0]);
+        exit(1);
     }
 
     *sdfp = SDFopen(NULL, argv[1]);
     if (*sdfp == NULL) {
-	fprintf(stderr, "%s: %s: %s\n", argv[0], argv[1], SDFerrstring);
-	exit(2);
+        fprintf(stderr, "%s: %s: %s\n", argv[0], argv[1], SDFerrstring);
+        exit(2);
     }
 
     if (access(argv[2], F_OK) == 0) {
         fprintf(stderr, "%s: %s exists; overwrite (y/n)? ", argv[0],
-		argv[2]);
+                argv[2]);
         input = getc(stdin);
         if ((input != 'y') && (input != 'Y'))
             exit(3);
@@ -90,14 +96,16 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 
     *fp = fopen(argv[2], "w");
     if (*fp == NULL) {
-	fprintf(stderr, "%s: %s\n", argv[2], strerror(errno));
-	exit(errno);
+        fprintf(stderr, "%s: %s\n", argv[2], strerror(errno));
+        exit(errno);
     }
 
     logg = atoi(argv[3]);
     printf("%d ", logg);
-    if(logg) printf("calculating log abundances\n");
-    else printf("calculating linear abundances\n");
+    if(logg==0) printf("calculating linear abundances\n");
+    if(logg==1) printf("calculating log abundances\n");
+    if(logg==2) printf("calculating mass density in cgs\n");
+    if(logg==3) printf("calculating mass density in cgs, leaving x,y,z in code units\n");
 
 }
 
@@ -132,7 +140,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     timecf = 1.e2;
 
     printf("length= %e, mass= %e, time= %e\n",
-		lengthcf, masscf, timecf);
+        lengthcf, masscf, timecf);
 
     /* Count structure members */
     /* don't use SDFnrecs, since that reads in the entire file which I'm trying to
@@ -145,15 +153,15 @@ static void writestructs(SDF *sdfp, FILE *fp)
             index[0]=i;
             flag=1;
         }
-		/* change the read in quantities here */
-		/* if you change the number of quantities read in, change
-		   'num' in the variable declarations also */
+                /* change the read in quantities here */
+                /* if you change the number of quantities read in, change
+                   'num' in the variable declarations also */
         if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
         if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f17", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
+        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[4]=i;
+        if (strncmp(vecs[i], "f7", strlen(vecs[i])) == 0) index[5]=i;
+        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[6]=i;
 
 /*
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
@@ -178,7 +186,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
         if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[5]=i;
 */
-	if (flag) ++nmembers;
+        if (flag) ++nmembers;
     }
     printf("nmembers = %d\n",nmembers);
 
@@ -193,29 +201,29 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
 /*one by one, go through the fields in the column, i.e. members of the struct?-CIE*/
     for (i = 0, stride = 0; i < num; ++i) {
-	    members[i] = vecs[index[i]];	/* quantities of interest */
-	    types[i] = SDFtype(members[i], sdfp);	/* their data types */
-	    inoffsets[i] = stride;/* offsets (from beginning of 'line'?) of each column
-                                            of data (struct member) */
-	    stride += SDFtype_sizes[types[i]];	/* strides in memory */
+        members[i] = vecs[index[i]];        /* quantities of interest */
+        types[i] = SDFtype(members[i], sdfp);        /* their data types */
+        inoffsets[i] = stride;/* offsets (from beginning of 'line'?) of each column
+                                    of data (struct member) */
+        stride += SDFtype_sizes[types[i]];        /* strides in memory */
         lines[i] = nlines;
         printf("member = %s offset: %d\n",members[i],inoffsets[i]);
-	}
+    }
 
     /* unnecesary, just use 'stride' ? CIE */
     outstride = 0;
     for( i = 0; i < num; i++) outstride += SDFtype_sizes[ types[i] ];
 
-	/* make room for btab to hold the read in data */
+        /* make room for btab to hold the read in data */
     btab = (void *)malloc(stride * nlines);
 
     /*calculate the byte offset in memory to the address of the next member-CIE*/
-	addrs[0] = (char *)btab;
-    strides[0] = outstride;		/* how did this run correctly without this line??? */
-	for ( i = 1; i < num; i++) {
-            addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
-            strides[i] = outstride;
-        }
+    addrs[0] = (char *)btab;
+    strides[0] = outstride;                /* how did this run correctly without this line??? */
+    for ( i = 1; i < num; i++) {
+        addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
+        strides[i] = outstride;
+    }
 
     for( k = 0; k < num; k++) {
         fprintf(fp,"%13s\t", members[k]);
@@ -235,42 +243,52 @@ static void writestructs(SDF *sdfp, FILE *fp)
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
-        rho = *((float *)(btab + inoffsets[4]));
-        mass = *((float *)(btab + inoffsets[3]));
+        rho = *((float *)(btab + inoffsets[3]));
+        mass = *((float *)(btab + inoffsets[4]));
         h = *((float *)(btab + inoffsets[5]));
 
-	/*convert to cgs*/
+        /*convert to cgs*/
+        if(logg==2 || logg==3) {
+            x = x*lengthcf;
+            y = y*lengthcf;
+            z = z*lengthcf;
+            rho = rho*masscf/(lengthcf*lengthcf*lengthcf);
 /*
-	x = x*lengthcf;
-	y = y*lengthcf;
-	z = z*lengthcf;
-	rho = rho*masscf/(lengthcf*lengthcf*lengthcf);
-	mass = mass*masscf;
-	h = h*lengthcf;
+            mass = mass*masscf;
+            h = h*lengthcf;
 */
 
 
-	/*copy back to btab*/
-	/*
-	memcpy( btab+inoffsets[0], &x, sizeof(x));
-	memcpy( btab+inoffsets[1], &y, sizeof(y));
-	memcpy( btab+inoffsets[2], &z, sizeof(z));
-	memcpy( btab+inoffsets[3], &mass, sizeof(mass));
-	memcpy( btab+inoffsets[4], &rho, sizeof(rho));
-	memcpy( btab+inoffsets[5], &h, sizeof(h));
-	*/
+            /*copy back to btab*/
+            if(logg==2) {
+                memcpy( btab+inoffsets[0], &x, sizeof(x));
+                memcpy( btab+inoffsets[1], &y, sizeof(y));
+                memcpy( btab+inoffsets[2], &z, sizeof(z));
+                memcpy( btab+inoffsets[3], &rho, sizeof(rho));
 /*
-		At this point different thresholds can be set for
-		selecting particles, e.g.:
+                memcpy( btab+inoffsets[4], &mass, sizeof(mass));
+                memcpy( btab+inoffsets[5], &h, sizeof(h));
+*/
+            }
+            if(logg==3)
+                memcpy( btab+inoffsets[3], &rho, sizeof(rho));
+        }
+/*
+                At this point different thresholds can be set for
+                selecting particles, e.g.:
         if((x >= 0.0) && (y >= 0.0) && (z >= 0.0)) {
 */
         if( rho >= 0.0e-0) {
             for( k = 0; k < num; k++) {
 
-				/* calculate log abundances if flag is set */
-                if(logg && (k>2)){
-                *((float *)(btab + inoffsets[k])) =
-			log10(*((float *)(btab + inoffsets[k]))+1.e-20);
+                /* calculate log abundances if flag is set */
+                if(logg==1 && (k>2)){
+                    *((float *)(btab + inoffsets[k])) =
+                        log10(*((float *)(btab + inoffsets[k]))+1.e-20);
+                }
+
+                if( (logg==2 || logg==3) && k>3) {
+                    *((float *)(btab + inoffsets[k])) *= rho;
                 }
 
                 type = SDFtype(members[k], sdfp);
