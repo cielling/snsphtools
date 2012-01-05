@@ -49,6 +49,7 @@ static void writescalars(SDF *sdfp, FILE *fp);
 static void writestructs(SDF *sdfp, FILE *fp);
 
 static const int NISO = 22;
+static int asym_u = 0;
 
 void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
 
@@ -75,8 +76,8 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 {
     char input;
 
-    if (argc != 3) {
-	fprintf(stderr, "Usage: %s SDFfile outfile\n", argv[0]);
+    if (argc != 4) {
+	fprintf(stderr, "Usage: %s SDFfile outfile asym_u\n", argv[0]);
 	exit(1);
     }
 
@@ -98,6 +99,9 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 	fprintf(stderr, "%s: %s\n", argv[2], strerror(errno));
 	exit(errno);
     }
+
+    asym_u = atoi(argv[3]);
+    if(asym_u == 1) printf("calculating asymmetry in u also\n");
 }
 
 static void writeinit(FILE *fp)
@@ -117,7 +121,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
     nvecs = SDFnvecs(sdfp);/*figure out number of lines in the header, basically-CIE*/
     vecs = SDFvecnames(sdfp);/*get the names of the variables/parameters in the header-CIE*/
 
-/*go through all of them individually-CIE*/
+    /*go through all of them individually-CIE*/
     for (i = 0; i < nvecs; ++i) {
         /*figure out if scalar(=1) or array(!=1)?-CIE*/
 /*
@@ -134,10 +138,10 @@ static void writescalars(SDF *sdfp, FILE *fp)
 	   don't think there's an equivalent for the SDFrdvecs family
 	   though, so "read; convert type; write" is the general
 	   path. */
-/*read in header file, line by line, with the appropriate function-CIE*/
+        /*read in header file, line by line, with the appropriate function-CIE*/
 	switch (type) {
 	case SDF_INT:
-/*SDFget*:sdfp=sdf file; vecs[i]= variable name; datum.*=holds value of that variable-CIE*/
+        /*SDFget*:sdfp=sdf file; vecs[i]= variable name; datum.*=holds value of that variable-CIE*/
 	    SDFgetint(sdfp, vecs[i], &(datum.i));
 	    break;
 	case SDF_FLOAT:
@@ -151,7 +155,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
 /* 	    exit(-1); */
 	}
 
-/*write header file, line by line, as the appropriate data type-CIE*/
+        /*write header file, line by line, as the appropriate data type-CIE*/
 	switch (type) {
 	case SDF_INT:
 	    fprintf(fp, "int %s = %d;\n", vecs[i], datum.i);
@@ -175,7 +179,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int i, j, nvecs, nmembers;
     int len, counter, flag = 0;
     int nrecs;
-    int ixvel;
+    int ixvel, iu;
     int *strides, *nobjs, *starts, *inoffsets;
     char **vecs, **members;
     SDF_type_t *types;
@@ -185,7 +189,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     double alpha, beta, vfactor;
     float set_radius;
     double x, y, z, radius;
-    float vx, vy, vz, vx2, vy2, vz2;
+    float vx, vy, vz, vx2, vy2, vz2, u;
 
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
@@ -232,7 +236,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fprintf(frp,"nmembers = %d\n",nmembers);
 
 
-/*malloc memory space for the respective features of the struct-CIE*/
+    /*malloc memory space for the respective features of the struct-CIE*/
     members = (char **)malloc(nmembers * sizeof(char *));
     addrs = (void **)malloc(nmembers * sizeof(void *));
     strides = (int *)malloc(nmembers * sizeof(int));
@@ -241,7 +245,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     types = (SDF_type_t *)malloc(nmembers * sizeof(SDF_type_t));
     inoffsets = (int *)malloc(nmembers * sizeof(int));
 
-/*one by one, go through all the fields in the column, i.e. members of the struct?-CIE*/
+    /*one by one, go through all the fields in the column, i.e. members of the struct?-CIE*/
     flag = 0;
     for (i = 0, nmembers = 0, stride = 0; i < nvecs; ++i) {
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
@@ -255,6 +259,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    types[nmembers] = SDFtype(members[nmembers], sdfp);
 	    inoffsets[nmembers] = stride;
             if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) ixvel = nmembers;
+            if (strncmp(vecs[i], "u", strlen(vecs[i])) == 0) iu = nmembers;
 	    stride += SDFtype_sizes[types[nmembers]];
 
 	    ++nmembers;
@@ -271,8 +276,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	strides[i] = stride;
     }
 
-
-/* up to here just the SDF file is read in, so everything stays the same -CIE */
 
     /*print the struct declaration part from the header-CIE*/
     fprintf(fp, "struct {\n");
@@ -315,19 +318,26 @@ static void writestructs(SDF *sdfp, FILE *fp)
         vy = *(float *)(btab + inoffsets[ixvel+1]);
         vz = *(float *)(btab + inoffsets[ixvel+2]);
 
+        /* get internal energy */
+        if(asym_u == 1)
+            u = *(float *)(btab + inoffsets[iu]);
+
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        if( (fabs((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
+        if( (((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
             || (radius < set_radius)) {
             /* jet geometry */
             vx2 = (alpha + beta * fabs(z) /radius) * vx;
             vy2 = (alpha + beta * fabs(z) /radius) * vy;
             vz2 = (alpha + beta * fabs(z) /radius) * vz;
+            if(asym_u == 1)
+                u = (alpha + beta * fabs(z)/radius) * u;
             /* equatorial geometry */
 /*
             vx2 = (alpha - beta * fabs(x) /radius) * vx;
             vy2 = (alpha - beta * fabs(x) /radius) * vy;
             vz2 = (alpha - beta * fabs(x) /radius) * vz;
+            u = (alpha - beta * fabs(x)/radius) * u;
 */
         } else {
             vx2 = vx * vfactor;
@@ -338,6 +348,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
         memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
         memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
         memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+        if(asym_u == 1)
+            memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
 
         /*dump the outbtab data into the file now-CIE*/
         fwrite(btab, stride, 1, fp);
