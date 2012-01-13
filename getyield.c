@@ -120,7 +120,7 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
 {
     FILE *fp=NULL;
     int i, j, nlines=0;
-    char temp[21], line[101];
+    char temp[21], line[101], *lastpart;
     int counti=0, nn, np;
     float mass;
 
@@ -147,7 +147,6 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
         counti++;
     }
     counti--;
-    countis = counti;
 
     rewind(fp2);
 
@@ -160,42 +159,41 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
     }
 
 
+    /* get IDs of particles that were post-processed */
     while( !feof(fp) ) {
         fgets(line, 100, fp);
         nlines++;
+        lastpart = strstr(line, "nn");
+        if(lastpart != NULL) break;
     }
 
     rewind(fp);
+    nlines -= 2; /*step one back from '++', and one from header line */
 
     *partid = (int *)malloc( nlines*sizeof(int) );
-    fgets(line, 100, fp);
+    fgets(line, 100, fp); /* read in header line */
 
-    for(i = 0; i < nlines; i++) {
+    for(i = 0; i < nlines; i++)
         fscanf(fp, "%s %d %*s %*s %*e", temp, &((*partid)[i]));
-        if( strncmp(temp, "nn", strlen(temp)) == 0)
-            break;
-        }
-    fgets(line, 100, fp);
 
-    /* for now, just assume that we never want to get the yield of n=1,p=1 */
+
+    /* get (total) post-processed masses */
     while( !feof(fp) ) {
-        fscanf(fp, "%*s%*s %d %*s %*s %d %*s %*s %e %*s", &nn, &np,&mass);
+        fscanf(fp, "%*s%*s%d%*s%*s%d%*s%*s%e%*s", &nn, &np, &mass);
         for( j = 0; j < counti; j++) {
             if((nn == isotope[1][j]) && (np == isotope[0][j])) {
             (*ppyields)[j] = mass/1.9889e33;
+/*
+                printf("mass= %e, %d %d\n",(*ppyields)[j], np, nn);
+*/
             }
         }
     }
 
-/*
-    free(isotope[1]);
-    free(isotope[0]);
-    free(isotope);
-*/
 
     fclose(fp);
 
-    return i;
+    return nlines;
 }
 
 
@@ -273,7 +271,6 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     iso_arr[0] = (int *)malloc( n_iso*sizeof(int) );
     iso_arr[1] = (int *)malloc( n_iso*sizeof(int) );
 
-    printf("WARNING: make sure you've got 'm' vs 'n' and n_iso correct!\n");
 
     if( SDFgetfloat(sdfp, "massCF", &massCF) != 0) massCF = 1.9889e27;
     massCF = massCF/1.9889e33;
@@ -284,6 +281,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         SDFgetint(sdfp,nnames[i], &iso_arr[1][i]);
         printf("%3s = %2d\t", pnames[i], iso_arr[0][i]);
         printf("%3s = %2d\n", nnames[i], iso_arr[1][i]);
+    /* at some point, it would be cool to print out the chemical symbol
+       that corresponds to the given (np,nn) ... */
     }
 
     counti = 0;
@@ -322,7 +321,6 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         ii++;
     }
 
-    --counti;
     printf("counti: %d\n",counti);
 
     /* sort */
@@ -363,7 +361,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
             inoffsets[0] = outstride;
             outstride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];/*applies to output*/
             printf("member = %s offset: %d \n", members[0],inoffsets[0]);
-        } 
+        }
         if(i == gotcha[j] && j<counti) {
             members[j+1] = vecs[i];
             lines[j+1] = 1;//INCR;
@@ -380,11 +378,11 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
         } else if (i >= index[2]) {
             //outstride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];
-        } 
+        }
         if(i <= index[0]) {
             /* because SDFseekreadvecsarr wants the strides between successive
-               quantities in the input. If only one lines is read, this does not 
-               really have an effect 
+               quantities in the input. If only one lines is read, this does not
+               really have an effect
             */
             instride += SDFtype_sizes[ SDFtype(vecs[i],sdfp) ];
         }
@@ -444,10 +442,10 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
         if( npartids > 0 ) {
             if( (partids[ii] == ident) && (ii < npartids)) {
-                postprocd = 1;
+                postprocd = 1; /* don't add */
                 ii++;
             } else {
-                postprocd = 0;
+                postprocd = 0; /* add */
             }
         }
 
@@ -501,6 +499,9 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     free(pnames);
     free(nnames);
     free(ppyields);
+    free(isotope[1]);
+    free(isotope[0]);
+    free(isotope);
 
 }
 
