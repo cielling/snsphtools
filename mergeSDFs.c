@@ -5,6 +5,8 @@
         merged, or -99. to just paste the second file onto the first.
 
    NOTE: the original files are not modified.
+         - assumes currently that the body is the same, and the header from the 
+           first file is written
 
    DONE: 1) get list of columns in both SDF files
    DONE: 2) compare and exit if the headers are not the same
@@ -176,6 +178,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     int *inoffsets, *strides, *starts, *lines;
     int flag=0, incr=2;
     int npart1, npart2, newnpart, countnpart, max;
+    int ident, idindex;
     fpos_t pos1_npart;
     double x, y, z;
     float radius, R0;
@@ -215,7 +218,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
             printf("%s  %s\n", vecs1[i], vecs2[i]);
         }
         fprintf(stderr, "non-matching headers: %d and %d\n",nvecs1,nvecs2);
-        exit(1);
+//        exit(1);
     }
 
     printf("Enter merge radius or -99. : ");
@@ -243,17 +246,20 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 /*one by one, go through the fields in the column, i.e. members of the struct?-CE*/
     for (i = 0, stride = 0, nmembers = 0; i < nvecs1; ++i) {
         if (strncmp(vecs1[i], "x", strlen(vecs1[i])) == 0) flag=1;
+        if (strncmp(vecs1[i], "ident", strlen(vecs1[i])) == 0) idindex=nmembers;
         if(flag) {
 	    members1[nmembers] = vecs1[i];
-	    members2[nmembers] = vecs2[i];
+//	    members2[nmembers] = vecs2[i];
             /*printf("vecs1= %s vecs2= %s\n", members1[nmembers], members2[nmembers]);*/
 	    types[nmembers] = SDFtype(members1[nmembers], sdfp1);
+/*
             type2 = SDFtype(members2[nmembers], sdfp2);
 	    if( types[nmembers] != type2 ) {
 		fprintf(stderr, "non-matching data types in files: vecs1=%s vecs2=%s\n",
                         vecs1[nmembers], vecs2[nmembers]);
 		exit(1);
 	    }
+*/
 	    inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
                                             of data (struct member) */
 	    stride += SDFtype_sizes[types[nmembers]];
@@ -337,18 +343,23 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
             starts[j] = i;
 
         /* read data into btab (via addrs) */
-        SDFseekrdvecsarr(sdfp2, nmembers2, members2, starts, lines, addrs, strides);
+        SDFseekrdvecsarr(sdfp2, nmembers1, members1, starts, lines, addrs, strides);
 
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
 
+        /* update the particle id, so it does not start at 1 again */
+        ident = *((int *)(btab + inoffsets[idindex]));
+        ident += npart1; /* so there aren't duplicate particle ids */
+        memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
+
 	/*dump the btab data into the file now-CE*/
         if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
-        }
+        } else {printf("%e\n",radius);}
 
     }
     newnpart += countnpart;
