@@ -201,7 +201,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 */
 
     /* j4 geometry */
-    alpha = sqrt(1./7.);
+    alpha = sqrt(2./7.);
     beta = sqrt(9./7.);
 
     /* e2 geometry */
@@ -327,11 +327,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if( (((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
             || (radius < set_radius)) {
             /* jet geometry */
-            vx2 = (alpha + beta * fabs(z) /radius) * vx;
-            vy2 = (alpha + beta * fabs(z) /radius) * vy;
-            vz2 = (alpha + beta * fabs(z) /radius) * vz;
+            vx2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vx;
+            vy2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vy;
+            vz2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vz;
             if(asym_u == 1)
-                u = (alpha + beta * fabs(z)/radius) * u;
+                u = (alpha + beta * fabs(z*z)/(radius*radius)) * u;
             /* equatorial geometry */
 /*
             vx2 = (alpha - beta * fabs(x) /radius) * vx;
