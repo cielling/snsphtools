@@ -8,9 +8,9 @@
    NOTE:
     - this code assumes that 'npart' from the header contains the total number
     of particles.
-    - the physical quantities retrieved from the sdf can be changed (however, 
-    the first always has to be 'x'). If the number of variables retrieved is 
-    changed, also change 'num' to reflect the new value. 
+    - the physical quantities retrieved from the sdf can be changed (however,
+    the first always has to be 'x'). If the number of variables retrieved is
+    changed, also change 'num' to reflect the new value.
     - currently, the log-flag options are as follows
       * 0 = calculates linear abundances (i.e. just gets data from the SDF)
       * 1 = calculates the log of the abundances (meaning mass fractions)
@@ -53,8 +53,8 @@ typedef union {
 
 static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp);
 static void writestructs(SDF *sdfp, FILE *fp);
+int locate(float *bins, int Nbins, float val);
 
-int logg;
 
 int main(int argc, char *argv[])
 {
@@ -75,8 +75,8 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 {
     char input;
 
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s SDFfile outfile log_flag\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s SDFfile outfile\n", argv[0]);
         exit(1);
     }
 
@@ -100,49 +100,57 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
         exit(errno);
     }
 
-    logg = atoi(argv[3]);
-    printf("%d ", logg);
-    if(logg==0) printf("calculating linear abundances\n");
-    if(logg==1) printf("calculating log abundances\n");
-    if(logg==2) printf("calculating mass density in cgs\n");
-    if(logg==3) printf("calculating mass density in cgs, leaving x,y,z in code units\n");
-
 }
 
 /*this writes the actual data*/
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    int i, j, k, nvecs, nmembers;
-    char **vecs, **members;
     SDF_type_t *types, type;
     size_t stride = 0, outstride = 0;
     void *outbtab, *btab;
     void **addrs;
+    int i, j, k, nvecs, nmembers;
+    int INCR=1, flag=0, num=12;
+    int Nbins = 100, bin;
     int *inoffsets, *lines, *strides, *starts;
-    int INCR=1, flag=0, num=11;
-    float X_i[4], vbins[100], mbins[100], mtot[4];
-    int Nbins = 100;
-    float vmin, vmax;
     int nlines = 1, nrecs;
     int index[num];
-    double x, y, z;
+    char **vecs, **members;
+    char getmembrs[num][13];
+    float **dm, *dv;
+    float X_i[5], vbins[Nbins], mbins[Nbins][5], mtot[5];
+    float vmin=100, vmax=0, delv;
+    float vx, vy, vz;
     float vel,mass,masscf,lengthcf,timecf;
+    double x, y, z;
     /*make INCR and nlines user input */
 
-    for( k=0; k<4; k++) mtot[k]=0.;
+    for( k=0; k<5; k++) mtot[k]=0.;
+
+    /* specify here which quantities to read in.
+       note: a few things downstairs depend on the
+       order these are specified. change with care. */
+    strcpy(getmembrs[0],"x");
+    strcpy(getmembrs[1],"y");
+    strcpy(getmembrs[2],"z");
+    strcpy(getmembrs[3],"vx");
+    strcpy(getmembrs[4],"vy");
+    strcpy(getmembrs[5],"vz");
+    strcpy(getmembrs[6],"mass");
+    strcpy(getmembrs[7],"f2"); /* H */
+    strcpy(getmembrs[8],"f5"); /* O */
+    strcpy(getmembrs[9],"f8"); /* Si */
+    strcpy(getmembrs[10],"f18"); /* Fe */
+    strcpy(getmembrs[11],"f20"); /* Ni */
+
 
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
 
     SDFgetint(sdfp, "npart", &nrecs);
-    /*
-    SDFgetint(sdfp, "massCF", &masscf);
-    SDFgetint(sdfp, "timeCF", &timecf);
-    SDFgetint(sdfp, "lengthCF", &lengthcf);
-    */
-    masscf = 1.998e27;
-    lengthcf = 6.955e10;
-    timecf = 1.e2;
+    SDFgetfloatOrDefault(sdfp, "massCF", &masscf, 1.9889e27);
+    SDFgetfloatOrDefault(sdfp, "timeCF", &timecf, 1.e2);
+    SDFgetfloatOrDefault(sdfp, "lengthCF", &lengthcf, 6.955e10);
 
     printf("length= %e, mass= %e, time= %e\n",
         lengthcf, masscf, timecf);
@@ -161,22 +169,23 @@ static void writestructs(SDF *sdfp, FILE *fp)
                 /* change the read in quantities here */
                 /* if you change the number of quantities read in, change
                    'num' in the variable declarations also */
-        if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
-        if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "vy", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "vz", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[6]=i;
-        if (strncmp(vecs[i], "f1", strlen(vecs[i])) == 0) index[7]=i; /* c */
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[8]=i; /* O */
-        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[9]=i; /* Si */
-        if (strncmp(vecs[i], "f17", strlen(vecs[i])) == 0) index[10]=i; /* Ni */
-
+        for( k = 1; k < num; k++) {
+            if (strncmp(vecs[i], getmembrs[k], strlen(vecs[i])) == 0) {
+                index[k]=i;
+                break;
+            }
+        }
         if (flag) ++nmembers;
+
     }
     printf("nmembers = %d\n",nmembers);
 
 /*malloc memory space for the respective features of the struct-CIE*/
+    dm = (float **)malloc(nrecs*sizeof(float*));
+    for( i = 0; i < nrecs; i++) dm[i] = (float *)malloc( 5 * sizeof( float ));
+
+    dv = (float *)malloc(nrecs*sizeof(float));
+
     members = (char **)malloc(num * sizeof(char *));
     addrs = (void **)malloc(num * sizeof(void *));
     types = (SDF_type_t *)malloc(num * sizeof(SDF_type_t));
@@ -211,10 +220,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
         strides[i] = outstride;
     }
 
-    for( k = 0; k < num; k++) {
-        fprintf(fp,"%13s\t", members[k]);
-    }
-    fprintf(fp,"\n");
 
     printf("reading in %d lines ...\n",nrecs);
 
@@ -226,30 +231,61 @@ static void writestructs(SDF *sdfp, FILE *fp)
         SDFseekrdvecsarr(sdfp, num, members, starts, lines, addrs, strides);
 
         /* calculate quantities to apply threshold, if any */
-        vx = *((double *)(btab + inoffsets[1]));
-        vy = *((double *)(btab + inoffsets[2]));
-        vz = *((double *)(btab + inoffsets[3]));
-        mass = *((float *)(btab + inoffsets[4]));
-        X_i[0] = *((float *)(btab + inoffsets[5]));
-        X_i[1] = *((float *)(btab + inoffsets[6]));
-        X_i[2] = *((float *)(btab + inoffsets[7]));
-        X_i[3] = *((float *)(btab + inoffsets[8]));
+        x = *((double *)(btab + inoffsets[0]));
+        y = *((double *)(btab + inoffsets[1]));
+        z = *((double *)(btab + inoffsets[2]));
+        vx = *((float *)(btab + inoffsets[3]));
+        vy = *((float *)(btab + inoffsets[4]));
+        vz = *((float *)(btab + inoffsets[5]));
+        mass = *((float *)(btab + inoffsets[6]));
+        X_i[0] = *((float *)(btab + inoffsets[7]));
+        X_i[1] = *((float *)(btab + inoffsets[8]));
+        X_i[2] = *((float *)(btab + inoffsets[9]));
+        X_i[3] = *((float *)(btab + inoffsets[10]));
+        X_i[4] = *((float *)(btab + inoffsets[11]));
 
-        vel = (vx*x+vy*y+vz*z)/sqrt(x*x+y*y+z*z);        
+        vel = (vx*x+vy*y+vz*z)/sqrt(x*x+y*y+z*z)*lengthcf/timecf*1.e-5;
+        dv[j] = vel;
+
         if( vel < vmin) vmin = vel;
         if( vel > vmax) vmax = vel;
 
-        /* sum up the mass */
-        for( k = 0; k < 4; k++) 
+        /* running total of mass per element i */
+        for( k = 0; k < 5; k++) {
             mtot[k] += mass*X_i[k];
-
-        /* determine vel bin */
-
-        /* sum up the mass in vel bin */
-
+            dm[j][k] = mass*X_i[k];
         }
 
+
     }
+
+    delv = (vmax - vmin)/(float)(Nbins-1);
+    printf("delta: %e, max: %e, min: %e\n", delv, vmax, vmin);
+
+    for( k = 0; k<Nbins; k++) {
+        vbins[k] = vmin+delv*(float)k;
+        mbins[k][0] = 0.;
+        mbins[k][1] = 0.;
+        mbins[k][2] = 0.;
+        mbins[k][3] = 0.;
+        mbins[k][4] = 0.;
+    }
+
+    for( j = 0; j < nrecs; j++) {
+        /* determine vel bin */
+        bin = locate(vbins, Nbins, dv[j]);
+
+        /* sum up the mass in vel bin */
+        for( k = 0; k < 5; k++)
+            mbins[bin][k] += dm[j][k]/(mtot[k]*dv[j]);
+    }
+
+    fprintf(fp, "%14s %14s %14s %14s %14s %14s\n",
+            "vbins",getmembrs[7], getmembrs[8], getmembrs[9], getmembrs[10], getmembrs[11]);
+    for( k = 0; k < Nbins; k++) {
+        fprintf(fp, "%14e %14e %14e %14e %14e %14e\n", vbins[k], mbins[k][0], mbins[k][1], mbins[k][2], mbins[k][3], mbins[k][4]);
+    }
+
 
 
 /*and we're done! clean up now -CE: if it ever works*/
@@ -261,3 +297,29 @@ static void writestructs(SDF *sdfp, FILE *fp)
 */
     /*free(outbtab);*/
 }
+
+
+
+
+int locate(float *bins, int Nbins, float val) {
+    int jl, jm, ju;
+
+        /*quick bisection to locate the radial bins I'm in -CE */
+        if (val >= bins[Nbins-1])
+            jl = Nbins-1;
+        else if (val <= bins[0])
+            jl = 0;
+        else {
+            ju = Nbins - 1;
+            jl = 0;
+            while (ju-jl > 1) {
+               jm = (ju+jl) >> 1;
+               if ((val >= bins[jm]) == (bins[Nbins-1] >= bins[0]))
+                  jl=jm;
+               else
+                  ju=jm;
+            }
+        }
+    return jl;
+}
+
