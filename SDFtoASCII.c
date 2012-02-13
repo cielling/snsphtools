@@ -53,6 +53,8 @@ typedef union {
 
 static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp);
 static void writestructs(SDF *sdfp, FILE *fp);
+float Lodders(int Z);
+float get_solar(int Z, int N);
 
 int logg;
 
@@ -106,42 +108,69 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
     if(logg==1) printf("calculating log abundances\n");
     if(logg==2) printf("calculating mass density in cgs\n");
     if(logg==3) printf("calculating mass density in cgs, leaving x,y,z in code units\n");
+    if(logg==4) printf("calculating abundance relative to solar (Lodders)\n");
 
 }
 
 /*this writes the actual data*/
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    int i, j, k, nvecs, nmembers;
-    char **vecs, **members;
     SDF_type_t *types, type;
     size_t stride = 0, outstride = 0;
     void *outbtab, *btab;
     void **addrs;
+    int i, j, k, nvecs, nmembers;
     int *inoffsets, *lines, *strides, *starts;
-    int INCR=1, flag=0, num=7;
+    int INCR=1, flag=0, num=11;
     int nlines = 1, nrecs;
-    int index[num];
+    int index[num], getZ[5], getN[5];
+    char **vecs, **members;
+    char getmembrs[num][12], npchr[5], nnchr[5];
     double x, y, z;
     float rho,mass,h,masscf,lengthcf,timecf;
+    float sol_val, sn_val, sn_h;
     /*make INCR and nlines user input */
+
+
+    /* specify here which quantities to read in.
+       note: a few things downstairs depend on the
+       order these are specified. change with care. */
+    strcpy(getmembrs[0],"x");
+    strcpy(getmembrs[1],"y");
+    strcpy(getmembrs[2],"z");
+    strcpy(getmembrs[3],"rho");
+    strcpy(getmembrs[4],"mass");
+    strcpy(getmembrs[5],"h");
+    strcpy(getmembrs[6],"f2");
+    strcpy(getmembrs[7],"f4");
+    strcpy(getmembrs[8],"f5");
+    strcpy(getmembrs[9],"f15");
+    strcpy(getmembrs[10],"f19"); /* H */
+
 
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
 
     SDFgetint(sdfp, "npart", &nrecs);
-    /*
-    SDFgetint(sdfp, "massCF", &masscf);
-    SDFgetint(sdfp, "timeCF", &timecf);
-    SDFgetint(sdfp, "lengthCF", &lengthcf);
-    */
-    masscf = 1.998e27;
-    lengthcf = 6.955e10;
-    timecf = 1.e2;
+    SDFgetfloatOrDefault(sdfp, "massCF", &masscf, 1.9889e27);
+    SDFgetfloatOrDefault(sdfp, "timeCF", &timecf, 1.e2);
+    SDFgetfloatOrDefault(sdfp, "lengthCF", &lengthcf, 6.955e10);
 
     printf("length= %e, mass= %e, time= %e\n",
         lengthcf, masscf, timecf);
 
+            if(logg == 4) {
+/* fancy loop to get the A of the isotope for calculating atomic mass of it */
+                for(k = 6; k<num; k++) {
+                    strcpy(npchr, getmembrs[k]);
+                    npchr[0]='p';
+                    strcpy(nnchr, getmembrs[k]);
+                    nnchr[0]='n';
+                    SDFgetint(sdfp, npchr, &getZ[k-6]);
+                    SDFgetint(sdfp, nnchr, &getN[k-6]);
+                    printf("isotope %s = %d, %d\n",getmembrs[k],getZ[k-6],getN[k-6]);
+                }
+            }
     /* Count structure members */
     /* don't use SDFnrecs, since that reads in the entire file which I'm trying to
        avoid. But I know that the structure (so far) always has "x" as the first
@@ -156,36 +185,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
                 /* change the read in quantities here */
                 /* if you change the number of quantities read in, change
                    'num' in the variable declarations also */
-        if (strncmp(vecs[i], "y", strlen(vecs[i])) == 0) index[1]=i;
-        if (strncmp(vecs[i], "z", strlen(vecs[i])) == 0) index[2]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f7", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[6]=i;
-
-/*
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
-
-        if (strncmp(vecs[i], "f1", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f12", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f19", strlen(vecs[i])) == 0) index[6]=i;
-
-
-        if (strncmp(vecs[i], "f5", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "f15", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "f18", strlen(vecs[i])) == 0) index[5]=i;
-        if (strncmp(vecs[i], "f2", strlen(vecs[i])) == 0) index[6]=i;
-
-        if (strncmp(vecs[i], "f20", strlen(vecs[i])) == 0) index[5]=i;
-
-        if (strncmp(vecs[i], "mass", strlen(vecs[i])) == 0) index[3]=i;
-        if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) index[4]=i;
-        if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) index[5]=i;
-*/
+        for( k = 1; k < num; k++) {
+            if (strncmp(vecs[i], getmembrs[k], strlen(vecs[i])) == 0) {
+                index[k]=i;
+                break;
+            }
+        }
         if (flag) ++nmembers;
     }
     printf("nmembers = %d\n",nmembers);
@@ -291,6 +296,15 @@ static void writestructs(SDF *sdfp, FILE *fp)
                     *((float *)(btab + inoffsets[k])) *= rho;
                 }
 
+                if( logg == 4 && k > 5 && k < num-1) {
+                   sol_val = get_solar(getZ[k-6], getN[k-6]);
+                   sn_val = *((float *)(btab + inoffsets[k]));
+                   sn_h = *((float *)(btab + inoffsets[num-1]));
+                   sn_val = sn_val/sn_h*(1./((float)(getZ[k-6]+getN[k-6])));
+                   sn_val = sn_val/sol_val;
+                   memcpy(btab + inoffsets[k], &sn_val, SDFtype_sizes[ types[k] ]);
+                }
+
                 type = SDFtype(members[k], sdfp);
 
                 switch(type) {
@@ -321,3 +335,120 @@ static void writestructs(SDF *sdfp, FILE *fp)
 */
     /*free(outbtab);*/
 }
+
+
+
+
+float Lodders(int Z){
+
+    int i, j;
+    typedef struct{
+        int Z, N;
+        float astro, cosmo;
+    } solar;
+    solar data_Lod[100];
+
+    for( i = 0; i < 100; i++ )
+        data_Lod[i].Z = i+1;
+
+    data_Lod[0].astro = 12.00;
+    data_Lod[1].astro = 10.98;
+    data_Lod[2].astro = 3.35;
+    data_Lod[3].astro = 1.48;
+    data_Lod[4].astro = 2.85;
+    data_Lod[5].astro = 8.46;
+    data_Lod[6].astro = 7.90;
+    data_Lod[7].astro = 8.76;
+    data_Lod[8].astro = 4.53;
+    data_Lod[9].astro = 7.95;
+    data_Lod[10].astro = 6.37;
+    data_Lod[11].astro = 7.62;
+    data_Lod[12].astro = 6.54;
+    data_Lod[13].astro = 7.61;
+    data_Lod[14].astro = 5.54;
+    data_Lod[15].astro = 7.26;
+    data_Lod[16].astro = 5.33;
+    data_Lod[17].astro = 6.62;
+    data_Lod[18].astro = 5.18;
+    data_Lod[19].astro = 6.41;
+    data_Lod[20].astro = 3.15;
+    data_Lod[21].astro = 5.00;
+    data_Lod[22].astro = 4.07;
+    data_Lod[23].astro = 5.72;
+    data_Lod[24].astro = 5.58;
+    data_Lod[25].astro = 7.54;
+    data_Lod[26].astro = 4.98;
+    data_Lod[27].astro = 6.29;
+    data_Lod[28].astro = 4.34;
+    data_Lod[29].astro = 4.70;
+    data_Lod[30].astro = 3.17;
+    data_Lod[31].astro = 3.70;
+    data_Lod[32].astro = 2.40;
+    data_Lod[33].astro = 3.43;
+    data_Lod[34].astro = 2.67;
+    data_Lod[35].astro = 3.36;
+    data_Lod[36].astro = 2.43;
+    data_Lod[37].astro = 2.99;
+    data_Lod[38].astro = 2.28;
+    data_Lod[39].astro = 2.67;
+    data_Lod[40].astro = 1.49;
+    data_Lod[41].astro = 2.03;
+    data_Lod[42].astro = 1.89;
+    data_Lod[43].astro = 1.18;
+    data_Lod[44].astro = 1.77;
+    data_Lod[45].astro = 1.30;
+    data_Lod[46].astro = 1.81;
+    data_Lod[47].astro = 0.87;
+    data_Lod[48].astro = 2.19;
+    data_Lod[49].astro = 1.14;
+    data_Lod[50].astro = 2.30;
+    data_Lod[51].astro = 1.61;
+    data_Lod[52].astro = 2.35;
+    data_Lod[53].astro = 1.18;
+    data_Lod[54].astro = 2.25;
+    data_Lod[55].astro = 1.25;
+    data_Lod[56].astro = 1.68;
+    data_Lod[57].astro = 0.85;
+    data_Lod[58].astro = 1.54;
+    data_Lod[59].astro = 1.02;
+    data_Lod[60].astro = 0.60;
+    data_Lod[61].astro = 1.13;
+    data_Lod[62].astro = 0.38;
+    data_Lod[63].astro = 1.21;
+    data_Lod[64].astro = 0.56;
+    data_Lod[65].astro = 1.02;
+    data_Lod[66].astro = 0.18;
+    data_Lod[67].astro = 1.01;
+    data_Lod[68].astro = 0.16;
+    data_Lod[69].astro = 0.84;
+    data_Lod[70].astro = -0.06;
+    data_Lod[71].astro = 0.72;
+    data_Lod[72].astro = 0.33;
+    data_Lod[73].astro = 1.44;
+    data_Lod[74].astro = 1.42;
+    data_Lod[75].astro = 1.75;
+    data_Lod[76].astro = 0.91;
+    data_Lod[77].astro = 1.23;
+    data_Lod[78].astro = 0.88;
+    data_Lod[79].astro = 2.13;
+    data_Lod[80].astro = 0.76;
+    data_Lod[81].astro = 0.16;
+    data_Lod[82].astro = -0.42;
+
+    return data_Lod[Z-1].astro;
+}
+
+
+
+float get_solar(int Z, int N) {
+
+    float solar_h, solar_a;
+
+    solar_a = Lodders(Z);
+
+    solar_h = pow(10., (solar_a-12.));
+
+    return solar_h;
+
+}
+
