@@ -39,13 +39,7 @@ int main(int argc, char *argv[])
     int nmembers, nrecs, nvecs, idindex, ident, i, j, k, jl, jm, ju;
     int numA, Nbins, len, counter, flag = 0;
     int *nparr, *nnarr;
-    int want[2][NISO]={{0,1,2,6,7,8,10,12,14,15,16,18,20,20,22,24,26,26,26,27,28,28},/*Z*/
-                       {1,0,2,6,7,8,10,12,14,16,16,18,20,24,22,24,26,30,32,29,28,30}}; /*A-Z*/
-    char elements[33][3] = {{"N"},{"h"},{"he"},{"li"},{"be"},{"b"},{"c"},{"n"},{"o"},{"f"},{"ne"},
-                            {"na"},{"mg"},{"al"},{"si"},{"p"},{"s"},{"cl"},{"ar"},{"k"},{"ca"},
-                            {"sc"},{"ti"},{"v"},{"cr"},{"mn"},{"fe"},{"co"},{"ni"},{"cu"},
-                            {"zn"},{"ga"},{"ge"}};
-    char mychar[5];
+    char mychar[5], **names;
     size_t stride = 0, outstride = 0;
     float **abundarr; /*should this be void * ? */
     double x, y, z, radius;
@@ -109,44 +103,28 @@ int main(int argc, char *argv[])
 
     /* now need to read in the abundances, and other necessary stuff */
 
-    /* get Z and N of isotopes - WORKS!!*/
-    f2p = fopen("abundancereadme", "r");
-    if (!f2p) printf("error opening file abundancereadme\n");
+    fp = fopen("abund.txt", "r");
+    if (!fp) printf("error opening file abund.txt\n");
 
     /*read in first number, that's the number of isotopes in the file*/
-    fscanf(f2p, "%3d", &numA);
+    fscanf(fp, "%d", &numA);
+
+    /*read in second number, that's the number of lines in the file*/
+    fscanf(fp, "%d", &Nbins);
 
     nparr = (int *)malloc(numA * sizeof(int));
     nnarr = (int *)malloc(numA * sizeof(int));
 
-    for ( i = 0; i < numA; i++) fscanf(f2p, "%d", &nparr[i]);
-    for ( i = 0; i < numA; i++) fscanf(f2p, "%d", &nnarr[i]);
+    for ( i = 0; i < numA; i++) fscanf(fp, "%d", &nparr[i]);
+    for ( i = 0; i < numA; i++) fscanf(fp, "%d", &nnarr[i]);
 
-    fclose(f2p);
-    f2p = NULL;
+    names = (char **)malloc((numA+1) * sizeof(char *) );
+    for ( i = 0; i < numA + 1; i++) {
+        names[i] = (char *)malloc(4*sizeof(char));
+        fscanf(fp, "%s", &names[i]);
+    }
 
-
-    /* read in the radial bins - WORKS!!*/
-    f2p = fopen("inputh.dat", "r");
-    if (!f2p) printf("error opening inputh.dat\n");
-
-    /*malloc array and read in radial bins. don't know how many, but guess 1000
-      and realloc later if we run out of space -CE */
-    radbin = (float *)malloc(1000 * sizeof(float));
-
-    Nbins = 0;
-    do {
-        fscanf(f2p, "%21G", &radbin[Nbins++]);
-        fscanf(f2p, "%*21g"); /* reads in h's. not needed */
-        if(!(Nbins % 1000)) realloc(radbin, (Nbins+1000)*sizeof(float));
-    } while( !feof(f2p) );
-    Nbins--;
-    /*} while(radbin[Nbins-1] < 4.3e2);*/
-
-    fclose(f2p);
-    f2p = NULL;
-
-    /* malloc 2D array for abundances[radial bin][isotope] -CE */
+    /* malloc 2D array for abundances[radial bin][isotope] -CIE */
     abundarr = (float **)malloc(Nbins * sizeof( float *));
     if (!abundarr) printf("error allocating abundarr\n");
 
@@ -155,19 +133,21 @@ int main(int argc, char *argv[])
         if (!abundarr[i]) printf("error allocating abundarr[i]\n");
     }
 
-    /* read in abundance data - WORKS!!*/
-    f2p = fopen("abun.dat", "r");
-    if (!f2p) printf("error opening file abun.dat\n");
+    /* read in radial bins into radbin */
+    radbin = (float *)malloc(Nbins * sizeof(float));
+    if(!radbin) printf("error allocating radbin\n");
 
     /*read in abundances, one set for each radial bin*/
     for (i=0; i< Nbins; i++){
+        fscanf(fp,"%12G", &radbin[i]);
         for (j=0; j < numA; j++) {
-            fscanf(f2p, "%12E", &abundarr[i][j]);
+            fscanf(fp, "%12G", &abundarr[i][j]);
         }
     }
 
-    fclose(f2p);
-    f2p = NULL;
+    fclose(fp);
+    fp = NULL;
+
 
     fp = fopen("zonetopartid.dat", "w");
     if(!fp) printf("error opening file 'zonetopartid.dat'\n");
@@ -186,6 +166,8 @@ int main(int argc, char *argv[])
         ident = *((int *)(btab + inoffsets[ idindex ]));
 
         /*quick bisection to locate the radial bin I'm in -CE */
+        /* put everything below radbin[0] into first bin (bin zero),
+           and put everything above radbin[Nbins-1] into last bin */
         if (radius >= radbin[Nbins-1])
             jl = Nbins-1;
         else if (radius <= radbin[0])
@@ -202,7 +184,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        printf("rad= %E id= %d zone= %d\n", radius, ident, jl);
+        //printf("rad= %E id= %d zone= %d\n", radius, ident, jl);
 
 /* which index holds my bin number? -CE: jl */
 
