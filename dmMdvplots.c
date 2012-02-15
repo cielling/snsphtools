@@ -110,7 +110,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *outbtab, *btab;
     void **addrs;
     int i, j, k, nvecs, nmembers;
-    int INCR=1, flag=0, num=12;
+    int INCR=1, flag=0, num=14;
     int Nbins = 100, bin;
     int *inoffsets, *lines, *strides, *starts;
     int nlines = 1, nrecs;
@@ -118,14 +118,14 @@ static void writestructs(SDF *sdfp, FILE *fp)
     char **vecs, **members;
     char getmembrs[num][13];
     float **dm, *dv;
-    float X_i[5], vbins[Nbins], mbins[Nbins][5], mtot[5];
+    float X_i[7], vbins[Nbins], mbins[Nbins][7], mtot[7];
     float vmin=100, vmax=0, delv;
     float vx, vy, vz;
     float vel,mass,masscf,lengthcf,timecf;
     double x, y, z;
     /*make INCR and nlines user input */
 
-    for( k=0; k<5; k++) mtot[k]=0.;
+    for( k=0; k<(num-7); k++) mtot[k]=0.;
 
     /* specify here which quantities to read in.
        note: a few things downstairs depend on the
@@ -137,11 +137,13 @@ static void writestructs(SDF *sdfp, FILE *fp)
     strcpy(getmembrs[4],"vy");
     strcpy(getmembrs[5],"vz");
     strcpy(getmembrs[6],"mass");
-    strcpy(getmembrs[7],"f2"); /* H */
-    strcpy(getmembrs[8],"f5"); /* O */
-    strcpy(getmembrs[9],"f8"); /* Si */
-    strcpy(getmembrs[10],"f18"); /* Fe */
-    strcpy(getmembrs[11],"f20"); /* Ni */
+    strcpy(getmembrs[7],"f19"); /* H */
+    strcpy(getmembrs[8],"f2"); /* O */
+    strcpy(getmembrs[9],"f3"); /* Si */
+    strcpy(getmembrs[10],"f5"); /* Fe */
+    strcpy(getmembrs[11],"f7"); /* Ni */
+    strcpy(getmembrs[12],"f15"); /* Fe */
+    strcpy(getmembrs[13],"f17"); /* Ni */
 
 
     nvecs = SDFnvecs(sdfp);
@@ -182,7 +184,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
 /*malloc memory space for the respective features of the struct-CIE*/
     dm = (float **)malloc(nrecs*sizeof(float*));
-    for( i = 0; i < nrecs; i++) dm[i] = (float *)malloc( 5 * sizeof( float ));
+    for( i = 0; i < nrecs; i++) dm[i] = (float *)malloc( (num-7) * sizeof( float ));
 
     dv = (float *)malloc(nrecs*sizeof(float));
 
@@ -243,6 +245,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
         X_i[2] = *((float *)(btab + inoffsets[9]));
         X_i[3] = *((float *)(btab + inoffsets[10]));
         X_i[4] = *((float *)(btab + inoffsets[11]));
+        X_i[5] = *((float *)(btab + inoffsets[12]));
+        X_i[6] = *((float *)(btab + inoffsets[13]));
 
         vel = (vx*x+vy*y+vz*z)/sqrt(x*x+y*y+z*z)*lengthcf/timecf*1.e-5;
         dv[j] = vel;
@@ -251,7 +255,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if( vel > vmax) vmax = vel;
 
         /* running total of mass per element i */
-        for( k = 0; k < 5; k++) {
+        for( k = 0; k < (num-7); k++) {
             mtot[k] += mass*X_i[k];
             dm[j][k] = mass*X_i[k];
         }
@@ -264,11 +268,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
     for( k = 0; k<Nbins; k++) {
         vbins[k] = vmin+delv*(float)k;
-        mbins[k][0] = 0.;
-        mbins[k][1] = 0.;
-        mbins[k][2] = 0.;
-        mbins[k][3] = 0.;
-        mbins[k][4] = 0.;
+        for( j = 0; j < (num-7); j++ )
+            mbins[k][j] = 0.;
     }
 
     for( j = 0; j < nrecs; j++) {
@@ -276,14 +277,20 @@ static void writestructs(SDF *sdfp, FILE *fp)
         bin = locate(vbins, Nbins, dv[j]);
 
         /* sum up the mass in vel bin */
-        for( k = 0; k < 5; k++)
+        for( k = 0; k < (num-7); k++)
             mbins[bin][k] += dm[j][k]/(mtot[k]*dv[j]);
     }
 
-    fprintf(fp, "%14s %14s %14s %14s %14s %14s\n",
-            "vbins",getmembrs[7], getmembrs[8], getmembrs[9], getmembrs[10], getmembrs[11]);
+    fprintf(fp, "%14s ", "vbins");
+    for(k = 7; k < num; k++)
+        fprintf(fp, "%14s ", getmembrs[k]);
+    fprintf(fp, "\n");
+
     for( k = 0; k < Nbins; k++) {
-        fprintf(fp, "%14e %14e %14e %14e %14e %14e\n", vbins[k], mbins[k][0], mbins[k][1], mbins[k][2], mbins[k][3], mbins[k][4]);
+        fprintf(fp, "%14e ", vbins[k]);
+        for(j = 0; j < (num-7); j++)
+            fprintf(fp, "%14e ", mbins[k][j]);
+        fprintf(fp, "\n");
     }
 
 
