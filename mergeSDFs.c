@@ -186,6 +186,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 
     nvecs1 = SDFnvecs(sdfp1);
     vecs1 = SDFvecnames(sdfp1);
+    max = nvecs1;
 
     nvecs2 = SDFnvecs(sdfp2);
     vecs2 = SDFvecnames(sdfp2);
@@ -212,11 +213,13 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     }
 
     if( nmembers1 != nmembers2) {
+/*
         if (nvecs1 <= nvecs2) max = nvecs1;
         else max = nvecs2;
         for(i = 0; i < max; i++){
             printf("%s  %s\n", vecs1[i], vecs2[i]);
         }
+*/
         fprintf(stderr, "non-matching headers: %d and %d\n",nvecs1,nvecs2);
 //        exit(1);
     }
@@ -327,7 +330,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
-        else if( radius == -99. ) {
+        else if( R0 == -99.0 ) {
             fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
