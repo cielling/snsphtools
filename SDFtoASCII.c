@@ -144,8 +144,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
     strcpy(getmembrs[6],"f2");
     strcpy(getmembrs[7],"f5");
     strcpy(getmembrs[8],"f7");
-    strcpy(getmembrs[9],"f17");
-    strcpy(getmembrs[10],"f15"); /* Fe */
+    strcpy(getmembrs[9],"f15");
+    strcpy(getmembrs[10],"f17"); /* Fe */
 
 
     nvecs = SDFnvecs(sdfp);
@@ -296,13 +296,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
                     *((float *)(btab + inoffsets[k])) *= rho;
                 }
 
-                if( logg == 4 && k > 5 && k < num-1) {
+                if( logg == 4 && k > 5 && k < num) {
                    sol_val = get_solar(getZ[k-6], getN[k-6]);
-                   sol_fe = get_solar(26, 30);
                    sn_val = *((float *)(btab + inoffsets[k]));
-                   sn_h = *((float *)(btab + inoffsets[num-1]));
-                   sn_val = sn_val/sn_h*(56./((float)(getZ[k-6]+getN[k-6])));
-                   sn_val = sn_val/sol_val*sol_fe;
+                   sn_val = sn_val/((float)(getZ[k-6]+getN[k-6]));
+                   sn_val = sn_val/sol_val;
                    memcpy(btab + inoffsets[k], &sn_val, SDFtype_sizes[ types[k] ]);
                 }
 
