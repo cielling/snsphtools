@@ -11,7 +11,7 @@ double timeCF = 100.;
 #ifndef CONSTS
 #define CONSTS
 static const double GRAV_C =6.67428e-8;
-static const double A_COEFF =7.565700e-15;
+static const double A_RAD =7.565700e-15;
 static const double C_LIGHT =2.99792458e+10;
 static const double KES_COEFF =6.6524586e-25;
 static const double KFF_COEFF =0.640000e+23;
