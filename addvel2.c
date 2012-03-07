@@ -193,6 +193,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
 
+    printf("vfactor:");
+    scanf("%f",&vfactor);
+    printf("%f\n",vfactor);
+
     SDFgetint(sdfp, "npart", &nrecs);
     fprintf(frp,"%d particles\n", nrecs);
 
@@ -296,10 +300,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
         /* only for expanding velocities */
         if( radius < set_radius ) {
 
-            vfactor = 1.0/( 1.0 + exp(radius*acons - bcons) );
-            vx = vel * x / radius * vfactor;
-            vy = vel * y / radius * vfactor;
-            vz = vel * z / radius * vfactor;
+            vx = vfactor * radius* 0.333333333333/x;
+            vy = vfactor * radius* 0.333333333333/y;
+            vz = vfactor * radius* 0.333333333333/z;
 
             memcpy(btab + inoffsets[ixvel], &vx, SDFtype_sizes[ types[ixvel] ]);
             memcpy(btab + inoffsets[ixvel+1], &vy, SDFtype_sizes[ types[ixvel] ]);
