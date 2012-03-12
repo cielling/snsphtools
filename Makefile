@@ -13,5 +13,9 @@ LDLIBS = -lsw -lm
 
 all: $(PROGS)
 
+$(PROGS): $(PROGS).o nrutil.o
+
+nrutil.o: nrutil.c 
+
 clean:
 	-$(RM) $(PROGS) *.o *~
