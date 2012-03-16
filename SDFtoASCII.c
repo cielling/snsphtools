@@ -121,9 +121,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void **addrs;
     int i, j, k, nvecs, nmembers;
     int *inoffsets, *lines, *strides, *starts;
-    int INCR=1, flag=0, num=11;
+    int INCR=1, flag=0, num=12;
     int nlines = 1, nrecs;
-    int index[num], getZ[5], getN[5];
+    int index[num], getZ[6], getN[6];
     char **vecs, **members;
     char getmembrs[num][12], npchr[5], nnchr[5];
     double x, y, z;
@@ -142,10 +142,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
     strcpy(getmembrs[4],"mass");
     strcpy(getmembrs[5],"h");
     strcpy(getmembrs[6],"f2");
-    strcpy(getmembrs[7],"f5");
-    strcpy(getmembrs[8],"f7");
-    strcpy(getmembrs[9],"f15");
-    strcpy(getmembrs[10],"f17"); /* Fe */
+    strcpy(getmembrs[7],"f3");
+    strcpy(getmembrs[8],"f4");
+    strcpy(getmembrs[9],"f5");
+    strcpy(getmembrs[10],"f7"); /* Fe */
+    strcpy(getmembrs[11],"f15"); /* Fe */
 
 
     nvecs = SDFnvecs(sdfp);
