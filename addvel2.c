@@ -182,9 +182,13 @@ static void writestructs(SDF *sdfp, FILE *fp)
     size_t stride = 0;
     void *btab;
     void **addrs;
-    float set_radius, vel=1.0, vfactor, acons=0.227, bcons=146.6;
-    double x, y, z, radius;
+    float set_radius, vel=4.5, vfactor, acons, bcons;//acons=0.227, bcons=146.6;
+    float rho, u;
+    double x, y, z, radius, rad_ratio;
     float vx, vy, vz;
+
+    acons=1.e4;
+    bcons=1.e1;
 
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
@@ -193,9 +197,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
 
-    printf("vfactor:");
-    scanf("%f",&vfactor);
-    printf("%f\n",vfactor);
+    printf("vel:");
+    scanf("%f",&vel);
+    printf("%f\n",vel);
 
     SDFgetint(sdfp, "npart", &nrecs);
     fprintf(frp,"%d particles\n", nrecs);
@@ -287,7 +291,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
         x = *(double *)(btab + inoffsets[0]);
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
-        radius = sqrt( x*x + y*y + z*z );
+        radius =  sqrt(x*x + y*y + z*z);
+
+        rho = *(float *)(btab + inoffsets[9]);
+        u = *(float *)(btab + inoffsets[7]);
 
         /* get velocities */
 /*
@@ -298,11 +305,19 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        if( radius < set_radius ) {
+        if( radius < 2.*set_radius) {
 
+            //vfactor = 1.0/( 1.0 + exp(radius*acons - bcons) );
+            rad_ratio = radius/set_radius;
+            rad_ratio = pow(rad_ratio, 2.);
+            vfactor = vel/(1.+ acons*rad_ratio*exp(-bcons/rad_ratio));
+//            radius=sqrt(radius);
             vx = vfactor * radius* 0.333333333333/x;
             vy = vfactor * radius* 0.333333333333/y;
             vz = vfactor * radius* 0.333333333333/z;
+
+            //u = u*100./(1.+ acons*rad_ratio*exp(-bcons/rad_ratio));
+            //rho = rho*100./(1.+ acons*rad_ratio*exp(-bcons/rad_ratio));
 
             memcpy(btab + inoffsets[ixvel], &vx, SDFtype_sizes[ types[ixvel] ]);
             memcpy(btab + inoffsets[ixvel+1], &vy, SDFtype_sizes[ types[ixvel] ]);

@@ -346,6 +346,11 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 
 	/*dump the btab data into the file now-CE*/
         if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
+            /* update the particle id, so it does not start at 1 again */
+            ident = *((int *)(btab + inoffsets[idindex]));
+            ident += npart1; /* so there aren't duplicate particle ids */
+            memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
+
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
