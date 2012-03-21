@@ -176,12 +176,12 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     void *btab;
     void **addrs;
     int *inoffsets, *strides, *starts, *lines;
-    int flag=0, incr=2;
+    int flag=0, incr=1;
     int npart1, npart2, newnpart, countnpart, max;
-    int ident, idindex;
+    int ident, idindex, ident_last, ident_max;
     fpos_t pos1_npart;
     double x, y, z;
-    float radius, R0;
+    float radius, R0, maxR0;
     /*make INCR and nlines user input */
 
     nvecs1 = SDFnvecs(sdfp1);
@@ -213,13 +213,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     }
 
     if( nmembers1 != nmembers2) {
-/*
-        if (nvecs1 <= nvecs2) max = nvecs1;
-        else max = nvecs2;
-        for(i = 0; i < max; i++){
-            printf("%s  %s\n", vecs1[i], vecs2[i]);
-        }
-*/
         fprintf(stderr, "non-matching headers: %d and %d\n",nvecs1,nvecs2);
 //        exit(1);
     }
@@ -228,11 +221,13 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     scanf("%f", &R0);
     printf(" %f\n", R0);
 
+    printf("Enter max r: ");
+    scanf("%f",&maxR0);
+    printf("%f\n",maxR0); 
+
     SDFgetint(sdfp1, "npart", &npart1);
     SDFgetint(sdfp2, "npart", &npart2);
     printf("%d and %d particles\n", npart1, npart2);
-/* need to figure out how to update npart in the header, since in the future
-   that number will probably change from the inputfiles -CE */
 
 /*malloc memory space for the respective features of the struct-CE*/
     members1 = (char **)malloc(nmembers1 * sizeof(char *));
@@ -253,16 +248,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
         if(flag) {
 	    members1[nmembers] = vecs1[i];
 //	    members2[nmembers] = vecs2[i];
-            /*printf("vecs1= %s vecs2= %s\n", members1[nmembers], members2[nmembers]);*/
 	    types[nmembers] = SDFtype(members1[nmembers], sdfp1);
-/*
-            type2 = SDFtype(members2[nmembers], sdfp2);
-	    if( types[nmembers] != type2 ) {
-		fprintf(stderr, "non-matching data types in files: vecs1=%s vecs2=%s\n",
-                        vecs1[nmembers], vecs2[nmembers]);
-		exit(1);
-	    }
-*/
 	    inoffsets[nmembers] = stride;/* offsets (from beginning of 'line'?) of each column
                                             of data (struct member) */
 	    stride += SDFtype_sizes[types[nmembers]];
@@ -312,7 +298,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 /*loop over each file consecutively in chunks of data, write that chunk to file*/
 
     printf("getting file 1 .... ");
-    for( i=0, countnpart = 0; i < npart1; i++) {
+    for( i=0, countnpart = 0; i < npart1-1; i++) {
         /* need to increment starts-array */
         for( j = 0; j < nmembers1; j++)
             starts[j] = i;
@@ -327,20 +313,27 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 
 	/*dump the btab data into the file now-CE*/
         if( radius < R0 ) {
+            ident_last=ident;
+            ident = *((int *)(btab + inoffsets[idindex]));
+            if(ident_last==ident)printf("same ident\n");
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
         else if( R0 == -99.0 ) {
+            ident_last=ident;
+            ident = *((int *)(btab + inoffsets[idindex]));
+            if(ident_last==ident)printf("same ident\n");
             fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
 
     }
-    newnpart = countnpart;
+    newnpart = countnpart-1;
+    ident_max=ident;
 
     printf("got %d lines\n",countnpart);
     printf("getting file 2 .... ");
-    for( i=0, countnpart = 0; i < npart2; i++) {
+    for( i=0, countnpart = 0; i < npart2-1; i++) {
         /* need to increment starts-array */
         for( j = 0; j < nmembers1; j++)
             starts[j] = i;
@@ -353,19 +346,21 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
         z = *((double *)(btab + inoffsets[2]));
         radius = sqrt(x*x + y*y + z*z);
 
-        /* update the particle id, so it does not start at 1 again */
-        ident = *((int *)(btab + inoffsets[idindex]));
-        ident += npart1; /* so there aren't duplicate particle ids */
-        memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
-
 	/*dump the btab data into the file now-CE*/
-        if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
+        if( radius > R0 && radius <= maxR0) { /* radius is always greater than -99., no extra case needed*/
+            /* update the particle id, so it does not start at 1 again */
+            ident_last=ident;
+            ident = *((int *)(btab + inoffsets[idindex]));
+            if(ident_last==ident)printf(" same ident ");
+            ident += ident_max; /* so there aren't duplicate particle ids */
+            memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
+
 	    fwrite(btab, outstride, 1, fp);
             countnpart++;
-        } else {printf("%e\n",radius);}
+        } 
 
     }
-    newnpart += countnpart;
+    newnpart += countnpart-1;
     printf("got %d lines\n",countnpart);
 
     /* update npart to the new value */
