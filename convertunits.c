@@ -162,8 +162,11 @@ static void writescalars(SDF *sdfp, FILE *fp)
         if( strncmp(vecs[i], "Gnewt", strlen(vecs[i])) == 0 ) {
             datum.f = datum.f*lengthcf*lengthcf*lengthcf/(masscf*timecf*timecf);
 
+        } else if ( strncmp(vecs[i], "tolerance", strlen(vecs[i])) == 0 ) {
+            datum.f = datum.f * lengthcf/(timecf*timecf);
         } else if ( strncmp(vecs[i], "tpos", strlen(vecs[i])) == 0 ||
                     strncmp(vecs[i], "tvel", strlen(vecs[i])) == 0 ||
+                    strncmp(vecs[i], "dt", strlen(vecs[i])) == 0 ||
                     strncmp(vecs[i], "t_wind", strlen(vecs[i])) == 0 ) {
             datum.f = datum.f * timecf;
 
