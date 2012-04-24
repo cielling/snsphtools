@@ -177,6 +177,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int nrecs;
     int ixvel;
     int *strides, *nobjs, *starts, *inoffsets;
+    int mflag, hindex, rhoindex;
     char **vecs, **members;
     char member[10];
     SDF_type_t *types;
@@ -185,13 +186,14 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void **addrs;
     float set_radius, factor=4.5;
     double x, y, z, radius;
-    float var, var_ave;
+    float var, var_new, var_ave, rho, h;
 
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
 
     printf("quantity to rescale: \n");
     scanf("%s",member);
+    if( strncmp(member, "mass", 4) == 0) mflag = 1;
 
     printf("resetting %s above r=\n", member);
     scanf("%f",&set_radius);
@@ -241,6 +243,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
             if (strncmp(vecs[i], member, strlen(vecs[i])) == 0) ixvel = nmembers;
 	    stride += SDFtype_sizes[types[nmembers]];
 
+        if(mflag) {
+            if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) hindex = nmembers;
+            if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) rhoindex = nmembers;
+        }
 	    ++nmembers;
 	}
     }
@@ -297,10 +303,17 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* get quantity */
         var = *(float *)(btab + inoffsets[ixvel]);
-        var = (var-var_ave)*factor+var_ave;
+        var_new = (var-var_ave)*factor+var_ave;
+
+        if(mflag) {
+            h = *(float *)(btab + inoffsets[hindex]);
+            h = h*pow( (var_new/var), 0.33333333333333 );
+        }
 
         if( radius >= set_radius) {
-            memcpy(btab + inoffsets[ixvel], &var, SDFtype_sizes[ types[ixvel] ]);
+            memcpy(btab + inoffsets[ixvel], &var_new, SDFtype_sizes[ types[ixvel] ]);
+            if(mflag)
+            memcpy(btab + inoffsets[hindex], &h, SDFtype_sizes[ types[hindex] ]);
         }
 
         /*dump the outbtab data into the file now-CIE*/
