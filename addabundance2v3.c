@@ -218,6 +218,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     frp = fopen("log.out","w");
     if(!frp) printf("error opening log file!\n");
 
+    //if( SDFgetfloat(sdfp, "massCF", &massCF) != 0) massCF = 1.9889e27;
+    SDFgetfloat(sdfp, "massCF", &massCF);
+    SDFgetfloat(sdfp, "lenCF", &lengthCF);
+    SDFgetfloat(sdfp, "timeCF", &timeCF);
+    printf("%g %g %g\n", massCF, lengthCF, timeCF);
+
 
     SDFgetint(sdfp, "npart", &nrecs);
     printf("%d particles\n", nrecs);
@@ -492,14 +498,14 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* lastly, determine u from T. do in cgs */
         if(calc_u) {
-            eos_rho = rho/(lengthCF*lengthCF*lengthCF)*massCF; /* cgs */
+            eos_rho = rho*massCF/(lengthCF*lengthCF*lengthCF); /* cgs */
             eos_n = 0.0;
             for( i = 0; i < numA; i++) {
                 eos_n += ((double)eos_rho)*N_AVOG /(double)(nparr[i] + nnarr[i]) *
                      (double)abundarr[jl][i];
             }
             n_e = find_ne(newabund, nparr, nnarr, temp, eos_rho, Gridpts, Nel); /* cgs */
-            eos_n += n_e; /* code units */
+            eos_n += n_e; /* cgs */
             u_tot = (float)(1.5 * eos_n * K_BOLTZ * temp + 
                     A_RAD * temp * temp * temp * temp); 
             u_tot = (float)((double)u_tot/eos_rho); /* need specific internal energy */
