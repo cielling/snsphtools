@@ -170,22 +170,23 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int i, j, nvecs, nmembers;
     int len, counter, flag = 0;
     int nrecs;
-    int ixvel, iu, ident;
+    int ixvel, iu, ih, ident;
     int *strides, *nobjs, *starts, *inoffsets;
     char **vecs, **members;
     SDF_type_t *types;
     size_t stride = 0;
     void *btab;
     void **addrs;
-    float set_radius;
+    float set_radius, R0, h;
     double x, y, z, radius;
 
 
-    printf("set_radius: enter 0 if set by vr:");
+    printf("set_radius: enter 0 if set by vr, -1 if using R0:");
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
 
     SDFgetint(sdfp, "npart", &nrecs);
+    SDFgetfloat(sdfp, "R0", &R0);
 
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
@@ -220,6 +221,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    types[nmembers] = SDFtype(members[nmembers], sdfp);
 	    inoffsets[nmembers] = stride;
             if (strncmp(vecs[i], "ident", strlen(vecs[i])) == 0) ixvel = nmembers;
+            if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) ih = nmembers;
 	    stride += SDFtype_sizes[types[nmembers]];
 
 	    ++nmembers;
@@ -274,7 +276,21 @@ static void writestructs(SDF *sdfp, FILE *fp)
         ident = *(int *)(btab + inoffsets[ixvel]);
 
 
-        if( set_radius <= radius) {
+        if( set_radius < 0.0 ) {
+            h = *(float *)(btab + inoffsets[ih]);
+            if( radius > (R0 - 2.0*h) ) {
+                switch (onoff) {
+                case 1: /* turn on */
+                    ident = ident | (1<<30);
+                    break;
+                case 0: /* turn off */
+                    ident = ident & ~(1<<30);
+                    break;
+                /*default:*/
+                    /* do nothing. alternatively, could toggle the bit */
+                }
+            }
+        } else if( set_radius <= radius) {
            switch (onoff) {
            case 1: /* turn on */
                ident = ident | (1<<30);
