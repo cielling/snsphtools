@@ -177,19 +177,19 @@ static void writestructs(SDF *sdfp, FILE *fp)
 {
     FILE *frp = NULL;
     int i, j, nvecs, nmembers;
-    int len, counter, flag = 0;
+    int len, flag = 0;
     int nrecs;
-    int ixvel, iu;
+    int ixvel, iu, ih;
     int *strides, *nobjs, *starts, *inoffsets;
     char **vecs, **members;
     SDF_type_t *types;
     size_t stride = 0;
     void *btab;
     void **addrs;
-    double alpha, beta, vfactor;
-    float set_radius;
-    double x, y, z, radius;
-    float vx, vy, vz, vx2, vy2, vz2, u;
+    float alpha, beta, vfactor, theta;
+    float set_radius, v_vec, radius;
+    double x, y, z;
+    float vx, vy, vz, vx2, vy2, vz2, u, h, h3;
 
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
@@ -223,7 +223,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     vfactor = 1.00;
 
     SDFgetint(sdfp, "npart", &nrecs);
-    fprintf(frp,"%d particles\n", nrecs);
+    fprintf(stdout,"%d particles\n", nrecs);
 
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
@@ -233,7 +233,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
 	if (flag) ++nmembers;
     }
-    fprintf(frp,"nmembers = %d\n",nmembers);
+    fprintf(stdout,"nmembers = %d\n",nmembers);
 
 
     /*malloc memory space for the respective features of the struct-CIE*/
@@ -260,13 +260,14 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    inoffsets[nmembers] = stride;
             if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) ixvel = nmembers;
             if (strncmp(vecs[i], "u", strlen(vecs[i])) == 0) iu = nmembers;
+            if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) ih = nmembers;
 	    stride += SDFtype_sizes[types[nmembers]];
 
 	    ++nmembers;
 	}
     }
 
-    fprintf(frp,"vx at %d\n",ixvel);
+    fprintf(stdout,"vx at %d\n",ixvel);
 
     btab = (void *)malloc(stride);
 
@@ -311,51 +312,50 @@ static void writestructs(SDF *sdfp, FILE *fp)
         x = *(double *)(btab + inoffsets[0]);
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
-        radius = sqrt( x*x + y*y + z*z );
+        radius = (float)sqrt( x*x + y*y + z*z );
 
         /* get velocities */
         vx = *(float *)(btab + inoffsets[ixvel]);
         vy = *(float *)(btab + inoffsets[ixvel+1]);
         vz = *(float *)(btab + inoffsets[ixvel+2]);
+        v_vec = (vx*(float)x + vy*(float)y + vz*(float)z)/radius;
 
         /* get internal energy */
-        if(asym_u == 1)
+        if(asym_u == 1) {
             u = *(float *)(btab + inoffsets[iu]);
+            h = *(float *)(btab + inoffsets[ih]);
+            h3 = h*h*h;
+        }
+
+        theta = (float)(fabs(z*z)/(radius*radius)); /* negative for eq. asymmetry */
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        if( (((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
+        if( (v_vec > 0.0 && set_radius == 0.)
             || (radius < set_radius)) {
             /* jet geometry */
-            vx2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vx;
-            vy2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vy;
-            vz2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vz;
-            if(asym_u == 1)
-                u = (alpha + beta * fabs(z*z)/(radius*radius)) * u;
-            /* equatorial geometry */
-/*
-            vx2 = (alpha - beta * fabs(x) /radius) * vx;
-            vy2 = (alpha - beta * fabs(x) /radius) * vy;
-            vz2 = (alpha - beta * fabs(x) /radius) * vz;
-            u = (alpha - beta * fabs(x)/radius) * u;
-*/
-        } else {
-            vx2 = vx * vfactor;
-            vy2 = vy * vfactor;
-            vz2 = vz * vfactor;
-        }
+            vx2 = (alpha + beta * theta) * vx;
+            vy2 = (alpha + beta * theta) * vy;
+            vz2 = (alpha + beta * theta) * vz;
+            if(asym_u == 1) {
+                u = (alpha + beta * theta) * u;
+                h3 = (alpha + beta * theta) * h3;
+                h = pow(h3, 0.33333333333333);
+            }
 
-        memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
-        memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
-        memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
-        if(asym_u == 1)
-            memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+            memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
+            memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
+            memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+            if(asym_u == 1) {
+                memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+                memcpy(btab + inoffsets[ih], &h, SDFtype_sizes[ types[ih] ]);
+            }
+        }
 
         /*dump the outbtab data into the file now-CIE*/
         fwrite(btab, stride, 1, fp);
 
     }
-    fprintf(frp,"wrote %d abundances to file\n", counter);
 
     /*and we're done! clean up now -CIE*/
     free(members);
