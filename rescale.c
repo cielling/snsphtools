@@ -294,6 +294,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
         radius =  sqrt(x*x + y*y + z*z);
+        if(mflag)
         rho = *(float *)(btab + inoffsets[rhoindex]);
 
         if( radius >= set_radius) {
