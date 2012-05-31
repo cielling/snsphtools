@@ -215,7 +215,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     init_CoolTable(&Gridpts, &Nel);
     printf("%d by %d cooling terms\n",Gridpts, Nel);
 
-    frp = fopen("log.out","w");
+    frp = fopen("/work/01834/cielling/log.out","w");
     if(!frp) printf("error opening log file!\n");
 
     //if( SDFgetfloat(sdfp, "massCF", &massCF) != 0) massCF = 1.9889e27;
