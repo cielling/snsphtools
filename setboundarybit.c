@@ -278,7 +278,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         if( set_radius < 0.0 ) {
             h = *(float *)(btab + inoffsets[ih]);
-            if( radius > (R0 - 2.0*h) ) {
+            if( radius > (R0 - 2.5*h) ) {
                 switch (onoff) {
                 case 1: /* turn on */
                     ident = ident | (1<<30);
