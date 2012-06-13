@@ -186,12 +186,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     size_t stride = 0;
     void *btab;
     void **addrs;
-    double alpha, beta, vfactor;
+    double alpha, beta, vfactor, cos_angle;
     float set_radius;
     double x, y, z, radius;
-    float vx, vy, vz, vx2, vy2, vz2, u;
+    float vx, vy, vz, vx2, vy2, vz2, v_r, u;
 
-    frp = fopen("log.out", "w");
+    frp = fopen("/work/01834/cielling/log.out", "w");
     if(!frp) printf("error opening log file!\n");
 
     /* j2 geometry; from Hungerford, Fryer, & Warren 2003 */
@@ -207,13 +207,13 @@ static void writestructs(SDF *sdfp, FILE *fp)
     /* e2 geometry */
 /*
     alpha = 4./3.;
-    beta = 2./3.;
+    beta = -2./3.;
 */
 
     /* e4 geometry */
 /*
     alpha = 8./5.;
-    beta = 6./5.;
+    beta = -6./5.;
 */
 
     printf("set_radius: enter 0 if set by vr:");
@@ -312,11 +312,16 @@ static void writestructs(SDF *sdfp, FILE *fp)
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
         radius = sqrt( x*x + y*y + z*z );
+        if( beta < 0.) 
+            cos_angle = fabs(x)/radius; /* equatorial asymmetry */
+        else 
+            cos_angle = fabs(z)/radius; /* polar (jet) asymmetry */
 
         /* get velocities */
         vx = *(float *)(btab + inoffsets[ixvel]);
         vy = *(float *)(btab + inoffsets[ixvel+1]);
         vz = *(float *)(btab + inoffsets[ixvel+2]);
+        v_r = ((vx*x)+(vy*y)+(vz*z))/radius;
 
         /* get internal energy */
         if(asym_u == 1)
@@ -324,32 +329,22 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        if( (((vx*x)+(vy*y)+(vz*z))/radius > 0.0 && set_radius == 0.)
+        if( (v_r > 0.0 && set_radius == 0.)
             || (radius < set_radius)) {
             /* jet geometry */
-            vx2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vx;
-            vy2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vy;
-            vz2 = (alpha + beta * fabs(z*z) /(radius*radius)) * vz;
-            if(asym_u == 1)
-                u = (alpha + beta * fabs(z*z)/(radius*radius)) * u;
-            /* equatorial geometry */
-/*
-            vx2 = (alpha - beta * fabs(x) /radius) * vx;
-            vy2 = (alpha - beta * fabs(x) /radius) * vy;
-            vz2 = (alpha - beta * fabs(x) /radius) * vz;
-            u = (alpha - beta * fabs(x)/radius) * u;
-*/
-        } else {
-            vx2 = vx * vfactor;
-            vy2 = vy * vfactor;
-            vz2 = vz * vfactor;
-        }
+            vx2 = (alpha + beta * cos_angle) * vx;
+            vy2 = (alpha + beta * cos_angle) * vy;
+            vz2 = (alpha + beta * cos_angle) * vz;
+            if(asym_u == 1) {
+                u = (alpha + beta * cos_angle) * sqrt(u);
+                u = u*u; /* to conserve energy, since k.e. ~ v^2 and using same formula */
+                memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+            }
 
-        memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
-        memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
-        memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
-        if(asym_u == 1)
-            memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+            memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
+            memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
+            memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+        }
 
         /*dump the outbtab data into the file now-CIE*/
         fwrite(btab, stride, 1, fp);
