@@ -782,7 +782,7 @@ double find_ne(float abundarr[], int nparr[], int nnarr[] ,double temp, double r
       above table= j=-2, below table= j=-99
     */
     if (j==-2) j=0;
-    if (j == -99) j=Gridpts-1; 
+    if (j == -99) j=Gridpts-2; 
 
     for( n = 0; n < Nel; n++) X_el[n] = 0.; /*initialize all to zero*/
 
@@ -884,11 +884,11 @@ locate(float xx[], long Nel, float x, long *j)
          ju=jm;
    }
    /*if (true && true) && true (1 is true) then below (j<0) table*/
-   if ( (((x - xx[0])*sign <0) && ((x-xx[Nel-1])*sign <0)) && 1)
+   if ( ((x - xx[0])*sign <0) && ((x-xx[Nel-1])*sign <0))
 	   *j=-2; 
    /*if (not false && not false) && true (1 is true) then above (j>Nel) table*/
-   else if ( (!((x - xx[0])*sign <0) && !((x-xx[Nel-1])*sign <0)) && 1)
-	   *j=-99; 
+   else if ( ((x - xx[0])*sign >0) && ((x-xx[Nel-1])*sign >0))
+	   *j=Nel+1; 
    else *j=jl;
 } /*end locate*/
 
