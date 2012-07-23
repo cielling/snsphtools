@@ -178,7 +178,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     int *inoffsets, *strides, *starts, *lines;
     int flag=0, incr=1;
     int npart1, npart2, newnpart, countnpart, max;
-    int ident, idindex, ident_last, ident_max;
+    int ident, idindex, ident_last, ident_max, identnew;
     fpos_t pos1_npart;
     double x, y, z;
     float radius, R0, maxR0;
@@ -331,7 +331,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     newnpart = countnpart-1;
     ident_max=ident;
 
-    printf("got %d lines\n",countnpart);
+    printf("got %d lines, last ident=%d\n",countnpart,ident_max);
     printf("getting file 2 .... ");
     for( i=0, countnpart = 0; i < npart2-1; i++) {
         /* need to increment starts-array */
@@ -352,11 +352,11 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
             ident_last=ident;
             ident = *((int *)(btab + inoffsets[idindex]));
             if(ident_last==ident)printf(" same ident ");
-            ident += ident_max; /* so there aren't duplicate particle ids */
-            memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
+            ++countnpart;
+            identnew = countnpart + ident_max; /* so there aren't duplicate particle ids */
+            memcpy( btab + inoffsets[idindex], &identnew, sizeof(ident) );
 
 	    fwrite(btab, outstride, 1, fp);
-            countnpart++;
         } 
 
     }
