@@ -34,7 +34,7 @@ typedef union {
 
 static void initargs(int argc, char *argv[], SDF **sdfp1, SDF **sdfp2, FILE **fp);
 static void writeinit(FILE *fp);
-static void writescalars(SDF *sdfp1, FILE *fp, fpos_t *pos_npart);
+static void writescalars(SDF *sdfp1, FILE *fp, fpos_t *pos_npart, int max_npart);
 static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart);
 
 int main(int argc, char *argv[])
@@ -43,11 +43,18 @@ int main(int argc, char *argv[])
     SDF *sdfp2 = NULL;
     FILE *fp = NULL;
     fpos_t pos_npart;
+    int max_npart, npart1, npart2;
 
     initargs(argc, argv, &sdfp1, &sdfp2, &fp);
 
     writeinit(fp);
-    writescalars(sdfp1, fp, &pos_npart);/*writes the header for the scalars (non-structs)*/
+
+    /* determine the max number of particles */
+    SDFgetint(sdfp1, "npart", &npart1);
+    SDFgetint(sdfp2, "npart", &npart2);
+    max_npart = npart1+npart2;
+
+    writescalars(sdfp1, fp, &pos_npart, max_npart);/*writes the header for the scalars (non-structs)*/
     writestructs(sdfp1, sdfp2, fp, pos_npart);
 
     fclose(fp);
@@ -103,7 +110,7 @@ static void writeinit(FILE *fp)
     printf("hello\n");
 }
 
-static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart)
+static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int max_npart)
 {
     int i, nvecs;
     int flag = 0;
@@ -149,7 +156,7 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart)
 	case SDF_INT:
             if( !strncmp(vecs[i], "npart", strlen(vecs[i])) )
                 fgetpos(fp, &pos);
-	    fprintf(fp, "int %s = %d;\n", vecs[i], datum.i);
+	    fprintf(fp, "int %s = %d;\n", vecs[i], max_npart);
 	    break;
 	case SDF_FLOAT:
 	    fprintf(fp, "float %s = %.7g;\n", vecs[i], datum.f);
@@ -286,7 +293,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 	}
     }
     fgetpos(fp, &pos1_npart);
-    fprintf(fp, "}[%d];\n", npart1); /*figure out how to save the location of the file position
+    fprintf(fp, "}[%d];\n", npart1+npart2); /*figure out how to save the location of the file position
                                        indicator, so we can come back and update npart -CE */
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
