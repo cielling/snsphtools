@@ -77,14 +77,14 @@ int main(int argc, char *argv[])
     scanf("%d %d %d", &start, &nfile, &INCR);
     printf("%d %d\n", INCR, nfile);
 
-    for( i = start; i < nfile; i = i+INCR ) {
+    for( i = start; i <= nfile; i = i+INCR ) {
         if(i == start)
             first_file = 1;
         else
             first_file = 0;
 
         sprintf(sdfname, "%s%04d", argv[1], i);
-        sprintf(outname, "%s%04d.vla", argv[2], i);
+        sprintf(outname, "%s%04d.vlc", argv[2], i);
 
 
         /* current position */
@@ -172,7 +172,11 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
     int ident, ident1;
     int index[num];
     static int *idents = NULL;
-    double x, x1, y, y1, z, z1;
+    double x, x1, y, y1, z, z1, dx, dy, dz;
+    float vx, vy, vz, vx1, vy1, vz1, dvel;
+    float offs_x, offs_y, offs_z;
+
+    printf("first_file is %d\n", first_file);
 
     /* this does not attempt to load the whole file into memory, does it? -CE */
     nvecs = SDFnvecs(sdfp);
@@ -262,14 +266,13 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
 
         SDFseekrdvecsarr(sdfp, num, members, starts, lines, addrs, strides);
 
-	if(first_file) {
-		idents[j] = *(int *)(btab + inoffsets[index[7]]);
-	}
-
 	/* get current position */
 	x = *(double *)(btab + inoffsets[0]);
 	y = *(double *)(btab + inoffsets[1]);
 	z = *(double *)(btab + inoffsets[2]);
+	vx = *(double *)(btab + inoffsets[3]);
+	vy = *(double *)(btab + inoffsets[4]);
+	vz = *(double *)(btab + inoffsets[5]);
 	ident = *(int *)(btab + inoffsets[7]);
 
 
@@ -279,49 +282,109 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
 	x1 = *(double *)(btab1 + inoffsets[0]);
 	y1 = *(double *)(btab1 + inoffsets[1]);
 	z1 = *(double *)(btab1 + inoffsets[2]);
+	vx1 = *(double *)(btab + inoffsets[3]);
+	vy1 = *(double *)(btab + inoffsets[4]);
+	vz1 = *(double *)(btab + inoffsets[5]);
 	ident1 = *(int *)(btab1 + inoffsets[7]);
+
+        dx = x1 - x;
+        dy = y1 - y;
+        dz = z1 - z;
+
+        dvel = (vx1-vx)*dx + (vy1-vy)*dy + (vz1-vz)*dz;
 
 
         /* cut out 1. octant for more pleasant viewing experience */
-        if( (x < 0.0) || (y < 0.0) || (z < 0.0) ) {
+        //if( (x < 0.0) || (y < 0.0) || (z < 0.0) ) {
         /* for all subsequent files, check if there are absorbed particles between 
            current and previous ident; pad with 0 D- and V- vector */
-	if(!first_file) {
+
+	if(first_file == 1) {
+		idents[j] = *(int *)(btab + inoffsets[7]);
+	}
+
+        /* the already accreted particles */
+	if(first_file == 0) {
             while(idents[k] < ident) {
-                fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f\n", 0.f, 0.f, 0.f, 1.f);
-                fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f\n", 0.f, 0.f, 0.f, 1.f);
+               fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
+                       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+               fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
+                       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
 	        ++k;
             }
         }
 
         /* put particles absorbed in sdfp1 at the origin; read in particles */
 	while(ident < ident1) {
+            /* the "offset vector". = x_n*(1+1/60) - x_(n+1)/60; for 60 fps */
+            /* in this case, x+1 is 0,0,0 since particles are being accreted */
+            offs_x =0.0;// x*1.01666666666666;
+            offs_y =0.0;// y*1.01666666666666;
+            offs_z =0.0;// z*1.01666666666666;
+
 	    /* write initial position */
-            fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f\n", x, -1.0*y, z, 1.f);
-            fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f\n", -1.0*x, y, -1.0*z, 1.f);
+            fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
+                    x, -1.0*y, z, 0.f, 0.f, 1.f, 1.f);
+            fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
+                    offs_x, -1.0*offs_y, offs_z, 0.f, 0.f, 1.f, 1.f);
 
             ++j;
+            ++k;
             for( i = 0; i < num; i++)
                 starts[i] = j;
             SDFseekrdvecsarr(sdfp, num, members, starts, lines, addrs, strides);
             ident = *(int *)(btab + inoffsets[7]);
-	    if( first_file ) 
+	    if( first_file == 1) 
                 idents[j] = *(int *)(btab + inoffsets[7]);
             /* get next position */
             x = *(double *)(btab + inoffsets[0]);
             y = *(double *)(btab + inoffsets[1]);
             z = *(double *)(btab + inoffsets[2]);
+	    vx = *(double *)(btab + inoffsets[3]);
+	    vy = *(double *)(btab + inoffsets[4]);
+	    vz = *(double *)(btab + inoffsets[5]);
+
+            dx = x1 - x;
+            dy = y1 - y;
+            dz = z1 - z;
+        
+            dvel = (vx1-vx)*dx + (vy1-vy)*dy + (vz1-vz)*dz;
+
+            /* in case any particles are accreted between ident and ident1 */
+            if(first_file == 0) {
+                while(idents[k] < ident) {
+                    fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
+                            0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+                    fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
+                            0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+    	            ++k;
+                }
+            }
+
 	}
 
+        offs_x = x1;//x*1.01666666666666 - x1*0.01666666666666;
+        offs_y = y1;//y*1.01666666666666 - y1*0.01666666666666;
+        offs_z = z1;//z*1.01666666666666 - z1*0.01666666666666;
         /* write current and next particle position */
-        fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f\n", x, -1.0*y, z, 1.f);
-        fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f\n", x1, -1.0*y1, z1, 1.f);
+        if(dvel > 0.0) {
+            fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
+                    x, -1.0*y, z, 0.f, 0.f, 1.f, 1.f);
+            fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
+                    offs_x, -1.0*offs_y, offs_z, 0.f, 0.f, 1.f, 1.f);
+        } else {
+            fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
+                    x, -1.0*y, z, 0.f, 0.f, 1.f, 1.f);
+            fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
+                    offs_x, -1.0*offs_y, offs_z, 0.f, 0.f, 1.f, 1.f);
+        }
 
         ++l;
-        }
+        ++k;
+        //}
     }
 
-    printf("check: %d %d, %d %d\n", nrecs, j, nrecs1, l);
+    printf("check: %d %d, %d %d, %d %d\n", nrecs, j, nrecs1, l, nrecs-nrecs1, k);
 
 /*and we're done! clean up now -CE: if it ever works*/
 /*    free(members);
