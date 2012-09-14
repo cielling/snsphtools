@@ -119,7 +119,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     char getmembrs[num][13];
     float **dm, *dv;
     float X_i[7], vbins[Nbins], mbins[Nbins][7], mtot[7];
-    float vmin=100, vmax=0, delv;
+    float vmin=1.e30, vmax=0, delv;
     float vx, vy, vz;
     float vel,mass,masscf,lengthcf,timecf;
     double x, y, z;
@@ -139,11 +139,11 @@ static void writestructs(SDF *sdfp, FILE *fp)
     strcpy(getmembrs[6],"mass");
     strcpy(getmembrs[7],"f19"); /* H */
     strcpy(getmembrs[8],"f2"); /* O */
-    strcpy(getmembrs[9],"f3"); /* Si */
-    strcpy(getmembrs[10],"f5"); /* Fe */
-    strcpy(getmembrs[11],"f7"); /* Ni */
-    strcpy(getmembrs[12],"f15"); /* Fe */
-    strcpy(getmembrs[13],"f17"); /* Ni */
+    strcpy(getmembrs[9],"f3"); /* Ne */
+    strcpy(getmembrs[10],"f4"); /* Mg */
+    strcpy(getmembrs[11],"f5"); /* Si */
+    strcpy(getmembrs[12],"f7"); /* S */
+    strcpy(getmembrs[13],"f15"); /* Fe */
 
 
     nvecs = SDFnvecs(sdfp);

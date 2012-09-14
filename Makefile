@@ -5,7 +5,7 @@
 # on Mapache/Conejo: cjicc or mp-icc
 
 CPPFLAGS = -I$(TREEHOME)/include -wd1338,810
-CFLAGS = -Wall -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+CFLAGS = -g -Wall -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 LDFLAGS = -L$(TREEHOME)/Objfiles/$(ARCH)
 LDLIBS = -lsw -lm
 
