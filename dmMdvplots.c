@@ -111,7 +111,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void **addrs;
     int i, j, k, nvecs, nmembers;
     int INCR=1, flag=0, num=14;
-    int Nbins = 100, bin;
+    int Nbins = 200, bin;
     int *inoffsets, *lines, *strides, *starts;
     int nlines = 1, nrecs;
     int index[num];
@@ -278,9 +278,14 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* sum up the mass in vel bin */
         for( k = 0; k < (num-7); k++)
-            mbins[bin][k] += dm[j][k]/(mtot[k]*dv[j]);
+            mbins[bin][k] += dm[j][k]/(mtot[k]);
     }
 
+    fprintf(fp, "%14s ", "mtot=");
+    for( k = 7; k < num; ++k ) 
+        fprintf(fp, "%14e ", mtot[k]);
+    fprintf(fp, "\n");
+    
     fprintf(fp, "%14s ", "vbins");
     for(k = 7; k < num; k++)
         fprintf(fp, "%14s ", getmembrs[k]);
