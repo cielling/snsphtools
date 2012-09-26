@@ -201,8 +201,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
 */
 
     /* j4 geometry */
-    alpha = sqrt(2./7.);
+/*
+    alpha = sqrt(2./7.)-0.2;
     beta = sqrt(9./7.);
+*/
 
     /* e2 geometry */
 /*
@@ -211,10 +213,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
 */
 
     /* e4 geometry */
-/*
-    alpha = 8./5.;
+    /* subtrahend is an attempt to conserve energy better */
+    alpha = 8./5. -0.05;
     beta = -6./5.;
-*/
 
     printf("set_radius: enter 0 if set by vr:");
     scanf("%f",&set_radius);
@@ -329,7 +330,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        if( (v_r > 0.0 && set_radius == 0.)
+        if( (v_r > 0.0 && set_radius == 0)
             || (radius < set_radius)) {
             /* jet geometry */
             vx2 = (alpha + beta * cos_angle) * vx;
