@@ -175,6 +175,7 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
     double x, x1, y, y1, z, z1, dx, dy, dz;
     float vx, vy, vz, vx1, vy1, vz1, dvel;
     float offs_x, offs_y, offs_z;
+    float b_x, b_y, b_z, b_x1, b_y1, b_z1;
 
     printf("first_file is %d\n", first_file);
 
@@ -184,6 +185,14 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
 
     SDFgetint(sdfp, "npart", &nrecs);
     SDFgetint(sdfp1, "npart", &nrecs1);
+
+    SDFgetfloat(sdfp, "bndry_x", &b_x);
+    SDFgetfloat(sdfp, "bndry_y", &b_y);
+    SDFgetfloat(sdfp, "bndry_z", &b_z);
+
+    SDFgetfloat(sdfp1, "bndry_x", &b_x1);
+    SDFgetfloat(sdfp1, "bndry_y", &b_y1);
+    SDFgetfloat(sdfp1, "bndry_z", &b_z1);
 
     if( !idents)
         idents = (int *)calloc(nrecs,sizeof(int));
@@ -306,10 +315,11 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
         /* the already accreted particles */
 	if(first_file == 0) {
             while(idents[k] < ident) {
+               /* format: D/V x y z intensity r g b */
                fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+                       b_x, b_y, b_z, 1.f, 0.f, 1.f, 1.f);
                fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                       0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+                       b_x1, b_y1, b_z1, 1.f, 0.f, 1.f, 1.f);
 	        ++k;
             }
         }
@@ -318,15 +328,15 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
 	while(ident < ident1) {
             /* the "offset vector". = x_n*(1+1/60) - x_(n+1)/60; for 60 fps */
             /* in this case, x+1 is 0,0,0 since particles are being accreted */
-            offs_x =0.0;// x*1.01666666666666;
-            offs_y =0.0;// y*1.01666666666666;
-            offs_z =0.0;// z*1.01666666666666;
+            offs_x =b_x1;// x*1.01666666666666;
+            offs_y =b_y1;// y*1.01666666666666;
+            offs_z =b_z1;// z*1.01666666666666;
 
 	    /* write initial position */
             fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    x, -1.0*y, z, 0.f, 0.f, 1.f, 1.f);
+                    x, -1.0*y, z, 1.f, 0.f, 1.f, 1.f);
             fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                    offs_x, -1.0*offs_y, offs_z, 0.f, 0.f, 1.f, 1.f);
+                    offs_x, -1.0*offs_y, offs_z, 1.f, 0.f, 1.f, 1.f);
 
             ++j;
             ++k;
@@ -354,9 +364,9 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
             if(first_file == 0) {
                 while(idents[k] < ident) {
                     fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                            0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+                       b_x, b_y, b_z, 1.f, 0.f, 1.f, 1.f);
                     fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                            0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f);
+                       b_x1, b_y1, b_z1, 1.f, 0.f, 1.f, 1.f);
     	            ++k;
                 }
             }
@@ -369,14 +379,14 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
         /* write current and next particle position */
         if(dvel > 0.0) {
             fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    x, -1.0*y, z, 0.f, 0.f, 1.f, 1.f);
+                    x, -1.0*y, z, 1.f, 0.f, 0.f, 1.f);
             fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    offs_x, -1.0*offs_y, offs_z, 0.f, 0.f, 1.f, 1.f);
+                    offs_x, -1.0*offs_y, offs_z, 1.f, 0.f, 0.f, 1.f);
         } else {
             fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    x, -1.0*y, z, 0.f, 0.f, 1.f, 1.f);
+                    x, -1.0*y, z, 1.f, 1.f, 0.f, 0.f);
             fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    offs_x, -1.0*offs_y, offs_z, 0.f, 0.f, 1.f, 1.f);
+                    offs_x, -1.0*offs_y, offs_z, 1.f, 1.f, 0.f, 0.f);
         }
 
         ++l;
