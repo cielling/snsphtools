@@ -61,7 +61,7 @@ float v_out_of_cone(float f, float theta) {
 
 static const int NISO = 22;
 static int asym_u = 0;
-static float fratio, theta;
+static float fboost, theta;
 
 void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
 
@@ -115,7 +115,7 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
     asym_u = atoi(argv[5]);
     if(asym_u == 1) printf("calculating asymmetry in u also\n");
 
-    fratio = atof(argv[3]);
+    fboost = atof(argv[3]);
     theta = atof(argv[4]);
     theta *= 3.14159/180.; /* convert to radian */
 }
@@ -203,7 +203,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *btab;
     void **addrs;
     double cos_angle;
-    float set_radius;
+    float set_radius, vfactor;
     double x, y, z, radius;
     float vx, vy, vz, vx2, vy2, vz2, v_r, u;
 
@@ -292,6 +292,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fprintf(fp, "}[%d];\n", nrecs);
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
+    vfactor = 0.5*(1.0-fboost*fboost)*cos(theta);
+    vfactor += (1.0+fboost*fboost)*0.5;
+    vfactor = 1.0/sqrt(vfactor);
+    printf("%.4e \n",vfactor);
 
     for (j = 0; j < nrecs; ++j) {
 
@@ -324,20 +328,18 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
             cos_angle = fabs(z)/radius;
             if( theta > cos_angle) {
-                vfactor = v_in_cone(fratio, theta);
-                vx *= vfactor;
-                vy *= vfactor;
-                vz *= vfactor;
+                vx = vx * fboost * vfactor;
+                vy = vy * fboost * vfactor;
+                vz = vz * fboost * vfactor;
                 if(asym_u == 1) {
-                    u = vfactor * sqrt(u);
+                    u = fboost * vfactor * sqrt(u);
                     u = u*u; /* to conserve energy, since k.e. ~ v^2 and using same formula */
                     memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
                 }
             } else {
-                vfactor = v_out_of_cone(fratio, theta);
-                vx *= vfactor;
-                vy *= vfactor;
-                vz *= vfactor;
+                vx = vx * vfactor;
+                vy = vy * vfactor;
+                vz = vz * vfactor;
                 if(asym_u == 1) {
                     u = vfactor * sqrt(u);
                     u = u*u; /* to conserve energy, since k.e. ~ v^2 and using same formula */
@@ -345,9 +347,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
                 }
             }
 
-            memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
-            memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
-            memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+            memcpy(btab + inoffsets[ixvel], &vx, SDFtype_sizes[ types[ixvel] ]);
+            memcpy(btab + inoffsets[ixvel+1], &vy, SDFtype_sizes[ types[ixvel+1] ]);
+            memcpy(btab + inoffsets[ixvel+2], &vz, SDFtype_sizes[ types[ixvel+2] ]);
         }
 
         /*dump the outbtab data into the file now-CIE*/
