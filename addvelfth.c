@@ -118,6 +118,7 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
     fboost = atof(argv[3]);
     theta = atof(argv[4]);
     theta *= 3.14159/180.; /* convert to radian */
+    theta = cos(theta);
 }
 
 static void writeinit(FILE *fp)
@@ -211,9 +212,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
     if(!frp) printf("error opening log file!\n");
 
 
+    /* get some necessary quantities from user */
     printf("set_radius: enter 0 if set by vr:");
     scanf("%f",&set_radius);
-    printf("%f\n",set_radius);
+    printf("%f, fboost=%.4e theta=%.4e\n",set_radius, fboost, theta);
 
 
     SDFgetint(sdfp, "npart", &nrecs);
@@ -292,7 +294,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fprintf(fp, "}[%d];\n", nrecs);
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
-    vfactor = 0.5*(1.0-fboost*fboost)*cos(theta);
+    vfactor = 0.5*(1.0-fboost*fboost)*theta;
     vfactor += (1.0+fboost*fboost)*0.5;
     vfactor = 1.0/sqrt(vfactor);
     printf("%.4e \n",vfactor);
@@ -326,8 +328,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if( (v_r > 0.0 && set_radius == 0)
             || (radius < set_radius)) {
 
-            cos_angle = fabs(z)/radius;
-            if( theta > cos_angle) {
+            cos_angle = z/radius;
+            if( theta < cos_angle) {
                 vx = vx * fboost * vfactor;
                 vy = vy * fboost * vfactor;
                 vz = vz * fboost * vfactor;
