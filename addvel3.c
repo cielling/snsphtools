@@ -1,6 +1,6 @@
 /*
    PURPOSE:
-	to add a velocity to an sdf file
+	to add a velocity asymmetry to an sdf file
         This version should also work for large files, since it reads in the
         sdf file line-by-line.
 
@@ -49,6 +49,7 @@ static void writescalars(SDF *sdfp, FILE *fp);
 static void writestructs(SDF *sdfp, FILE *fp);
 
 static const int NISO = 22;
+static int asym_u = 0;
 
 void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
 
@@ -75,8 +76,8 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 {
     char input;
 
-    if (argc != 3) {
-	fprintf(stderr, "Usage: %s SDFfile outfile\n", argv[0]);
+    if (argc != 4) {
+	fprintf(stderr, "Usage: %s SDFfile outfile asym_u\n", argv[0]);
 	exit(1);
     }
 
@@ -98,6 +99,9 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 	fprintf(stderr, "%s: %s\n", argv[2], strerror(errno));
 	exit(errno);
     }
+
+    asym_u = atoi(argv[3]);
+    if(asym_u == 1) printf("calculating asymmetry in u also\n");
 }
 
 static void writeinit(FILE *fp)
@@ -117,7 +121,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
     nvecs = SDFnvecs(sdfp);/*figure out number of lines in the header, basically-CIE*/
     vecs = SDFvecnames(sdfp);/*get the names of the variables/parameters in the header-CIE*/
 
-/*go through all of them individually-CIE*/
+    /*go through all of them individually-CIE*/
     for (i = 0; i < nvecs; ++i) {
         /*figure out if scalar(=1) or array(!=1)?-CIE*/
 /*
@@ -134,10 +138,10 @@ static void writescalars(SDF *sdfp, FILE *fp)
 	   don't think there's an equivalent for the SDFrdvecs family
 	   though, so "read; convert type; write" is the general
 	   path. */
-/*read in header file, line by line, with the appropriate function-CIE*/
+        /*read in header file, line by line, with the appropriate function-CIE*/
 	switch (type) {
 	case SDF_INT:
-/*SDFget*:sdfp=sdf file; vecs[i]= variable name; datum.*=holds value of that variable-CIE*/
+        /*SDFget*:sdfp=sdf file; vecs[i]= variable name; datum.*=holds value of that variable-CIE*/
 	    SDFgetint(sdfp, vecs[i], &(datum.i));
 	    break;
 	case SDF_FLOAT:
@@ -151,7 +155,7 @@ static void writescalars(SDF *sdfp, FILE *fp)
 /* 	    exit(-1); */
 	}
 
-/*write header file, line by line, as the appropriate data type-CIE*/
+        /*write header file, line by line, as the appropriate data type-CIE*/
 	switch (type) {
 	case SDF_INT:
 	    fprintf(fp, "int %s = %d;\n", vecs[i], datum.i);
@@ -173,33 +177,38 @@ static void writestructs(SDF *sdfp, FILE *fp)
 {
     FILE *frp = NULL;
     int i, j, nvecs, nmembers;
-    int len, counter, flag = 0;
+    int len, counter=0, flag = 0;
     int nrecs;
-    int ixvel;
+    int ixvel, iu, ih;
     int *strides, *nobjs, *starts, *inoffsets;
     char **vecs, **members;
     SDF_type_t *types;
     size_t stride = 0;
     void *btab;
     void **addrs;
-    float set_radius, vel=4.5, vfactor, acons, bcons;//acons=0.227, bcons=146.6;
-    float rho, u;
-    double x, y, z, radius, rad_ratio;
-    float vx, vy, vz;
+    double alpha, beta, vfactor, cos_angle;
+    float fboost, theta,mass;
+    float set_radius;
+    double x, y, z, radius;
+    float vx, vy, vz, vx2, vy2, vz2, v_r, u, h;
 
-    acons=1.e4;
-    bcons=1.e1;
-
-    frp = fopen("log.out", "w");
+    frp = fopen("/work/01834/cielling/log.out", "w");
     if(!frp) printf("error opening log file!\n");
+
 
     printf("set_radius: enter 0 if set by vr:");
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
 
-    printf("vel:");
-    scanf("%f",&vel);
-    printf("%f\n",vel);
+    printf("enter boosting factor:\n");
+    scanf("%f", &fboost);
+    printf("%f\n", fboost);
+
+    printf("enter angle:\n");
+    scanf("%f", &theta);
+    printf("%f\n", theta);
+
+    vfactor = 1.00;
 
     SDFgetint(sdfp, "npart", &nrecs);
     fprintf(frp,"%d particles\n", nrecs);
@@ -215,7 +224,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fprintf(frp,"nmembers = %d\n",nmembers);
 
 
-/*malloc memory space for the respective features of the struct-CIE*/
+    /*malloc memory space for the respective features of the struct-CIE*/
     members = (char **)malloc(nmembers * sizeof(char *));
     addrs = (void **)malloc(nmembers * sizeof(void *));
     strides = (int *)malloc(nmembers * sizeof(int));
@@ -224,7 +233,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     types = (SDF_type_t *)malloc(nmembers * sizeof(SDF_type_t));
     inoffsets = (int *)malloc(nmembers * sizeof(int));
 
-/*one by one, go through all the fields in the column, i.e. members of the struct?-CIE*/
+    /*one by one, go through all the fields in the column, i.e. members of the struct?-CIE*/
     flag = 0;
     for (i = 0, nmembers = 0, stride = 0; i < nvecs; ++i) {
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
@@ -238,6 +247,8 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	    types[nmembers] = SDFtype(members[nmembers], sdfp);
 	    inoffsets[nmembers] = stride;
             if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) ixvel = nmembers;
+            if (strncmp(vecs[i], "u", strlen(vecs[i])) == 0) iu = nmembers;
+            if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) ih = nmembers;
 	    stride += SDFtype_sizes[types[nmembers]];
 
 	    ++nmembers;
@@ -254,8 +265,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	strides[i] = stride;
     }
 
-
-/* up to here just the SDF file is read in, so everything stays the same -CIE */
 
     /*print the struct declaration part from the header-CIE*/
     fprintf(fp, "struct {\n");
@@ -279,6 +288,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
 
+    theta = cos(theta*3.14159/180.);
+    printf("%f radians\n",theta);
+    vfactor = 0.5*(1.0-fboost*fboost)*(theta);
+    vfactor += (1.0+fboost*fboost)*0.5;
+    vfactor = 1.0/sqrt(vfactor);
+
     for (j = 0; j < nrecs; ++j) {
 
         for( i = 0; i < nmembers; i++) starts[i] = j;
@@ -291,44 +306,70 @@ static void writestructs(SDF *sdfp, FILE *fp)
         x = *(double *)(btab + inoffsets[0]);
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
-        radius =  sqrt(x*x + y*y + z*z);
-
-        rho = *(float *)(btab + inoffsets[9]);
-        u = *(float *)(btab + inoffsets[7]);
+        radius = sqrt( x*x + y*y + z*z );
+        cos_angle = (float)(z/radius); /* polar (jet) asymmetry */
 
         /* get velocities */
-/*
         vx = *(float *)(btab + inoffsets[ixvel]);
         vy = *(float *)(btab + inoffsets[ixvel+1]);
         vz = *(float *)(btab + inoffsets[ixvel+2]);
-*/
+        v_r = ((vx*x)+(vy*y)+(vz*z))/radius;
+        h = *(float *)(btab + inoffsets[ih]);
+        mass = *(float *)(btab + inoffsets[3]);
+
+        /* get internal energy */
+        if(asym_u == 1)
+            u = *(float *)(btab + inoffsets[iu]);
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
-        if( radius < 2.*set_radius) {
-
-            //vfactor = 1.0/( 1.0 + exp(radius*acons - bcons) );
-            rad_ratio = radius/set_radius;
-            rad_ratio = pow(rad_ratio, 2.);
-            vfactor = vel/(1.+ acons*rad_ratio*exp(-bcons/rad_ratio));
-//            radius=sqrt(radius);
-            vx = vfactor * radius* 0.333333333333/x;
-            vy = vfactor * radius* 0.333333333333/y;
-            vz = vfactor * radius* 0.333333333333/z;
-
-            //u = u*100./(1.+ acons*rad_ratio*exp(-bcons/rad_ratio));
-            //rho = rho*100./(1.+ acons*rad_ratio*exp(-bcons/rad_ratio));
-
-            memcpy(btab + inoffsets[ixvel], &vx, SDFtype_sizes[ types[ixvel] ]);
-            memcpy(btab + inoffsets[ixvel+1], &vy, SDFtype_sizes[ types[ixvel] ]);
-            memcpy(btab + inoffsets[ixvel+2], &vz, SDFtype_sizes[ types[ixvel] ]);
+        if( (v_r > 0.0 && set_radius == 0.)
+            || (radius < set_radius)) {
+            /* jet geometry */
+            if( cos_angle > theta) { 
+                vx2 = vx* fboost * vfactor;
+                vy2 = vy* fboost * vfactor;
+                vz2 = vz* fboost * vfactor;
+                if(asym_u == 1) {
+                    u = sqrt(u) * fboost * vfactor;
+                    u = u*u; /* to conserve energy, since k.e. ~ v^2 and using same formula */
+                    memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+                }
+    
+                memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
+                memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
+                memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+            } else {
+                vx2 = 0.0;//vx * vfactor;
+                vy2 = 0.0;//vx * vfactor;
+                vz2 = 0.0;//vx * vfactor;
+                if(asym_u == 1) {
+                    u = sqrt(u) * vfactor;
+                    u = u*u; /* to conserve energy, since k.e. ~ v^2 and using same formula */
+                    memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+                }
+    
+                memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
+                memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
+                memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+            }
         }
+        if(radius > set_radius && cos_angle > theta) {
+            h = h*4.64159; /* make rho=m/h^3 100x less dense -> increase h by 100^0.33 */
+            memcpy(btab + inoffsets[ih], &h, SDFtype_sizes[ types[ih] ]);
+            mass = 0.2*mass;
+            memcpy(btab + inoffsets[3], &mass, SDFtype_sizes[ types[3] ]);
+            ++counter;
+            if( (counter % 4) == 0 )
+                fwrite(btab, stride, 1, fp);
+        } else {
 
         /*dump the outbtab data into the file now-CIE*/
         fwrite(btab, stride, 1, fp);
+        }
 
     }
-    fprintf(frp,"wrote %d abundances to file\n", counter);
+    printf("wrote %d abundances to file\n", counter);
 
     /*and we're done! clean up now -CIE*/
     free(members);
