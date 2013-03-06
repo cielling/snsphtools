@@ -8,14 +8,14 @@
 
 //const int NDIM=3;
 
-void initargs(int argc, char* argv[], FILE** fp);
+void initargs(int argc, char* argv[], FILE** fp, int *nx, int *ny, int *nz);
 
 int main(int argc, char* argv[])
 {
 	FILE *fp=NULL;
 	SPHoutbody *outbtab, OneBody;
 	int i, j, k, index;
-	int nx=1000, ny=1000, nz=1000;
+	int nx, ny, nz;
 	float nx2, ny2, nz2;
 	int ngrid;
 	float dx, dy, dz, dh;
@@ -23,7 +23,9 @@ int main(int argc, char* argv[])
 	float R0=4.e5;
 
 	/*initargs: check if file exists, ask if overwrite*/
-	initargs(argc, argv, &fp);
+	initargs(argc, argv, &fp, &nx, &ny, &nz);
+
+	printf("set nx= %d ny= %d nz= %d\n",nx, ny, nz);
 
 	/*create the grid */
 	ngrid = nx*ny*nz;
@@ -58,9 +60,13 @@ int main(int argc, char* argv[])
 				outbtab[index].mass = 1.;
 				outbtab[index].h = dh;
 				outbtab[index].rho = 0.;
-				outbtab[index].nterms = 0.;
-
 				/*
+				outbtab[index].nterms = 0.;
+				outbtab[index].temp = 0.;
+				outbtab[index].vel[0] = 0.;
+				outbtab[index].vel[1] = 0.;
+				outbtab[index].vel[2] = 0.;
+
 				OneBody.pos[0] = (double)ii*dx;
 				OneBody.pos[1] = (double)jj*dy;
 				OneBody.pos[2] = (double)kk*dz;
@@ -117,12 +123,12 @@ int main(int argc, char* argv[])
 }
 
 
-void initargs(int argc, char* argv[], FILE** fp) {
+void initargs(int argc, char* argv[], FILE** fp, int *nx, int *ny, int *nz) {
 
 	char input;
 
-	if( argc != 2 ) {
-		fprintf(stderr, "Usage: %s outfile\n", argv[0]); 
+	if( argc != 5 ) {
+		fprintf(stderr, "Usage: %s outfile nx ny nz\n", argv[0]); 
 		exit(1);
 	}
 
@@ -145,5 +151,9 @@ void initargs(int argc, char* argv[], FILE** fp) {
 		fprintf(stderr, "%s: %s\n", argv[0], strerror(errno));
 		exit(errno);
 	}
+
+	*nx = atoi(argv[2]);
+	*ny = atoi(argv[3]);
+	*nz = atoi(argv[4]);
 
 }
