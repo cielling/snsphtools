@@ -153,6 +153,9 @@ int main(int argc, char* argv[])
 		"tvel", SDF_FLOAT, 0.,
 		"gamma", SDF_FLOAT, 1.67,
 		"R0", SDF_FLOAT, R0,
+		"nx", SDF_INT, nx,
+		"ny", SDF_INT, ny,
+		"nz", SDF_INT, nz,
 		NULL);
 		
 
