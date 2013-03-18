@@ -104,6 +104,12 @@ int main(int argc, char* argv[])
 				outbtab[index].vel[2] = 0.;
 				outbtab[index].f2 = 0.;
 				outbtab[index].f3 = 0.;
+				outbtab[index].f4 = 0.;
+				outbtab[index].f5 = 0.;
+				outbtab[index].f7 = 0.;
+				outbtab[index].f12 = 0.;
+				outbtab[index].f15 = 0.;
+				outbtab[index].f17 = 0.;
 
 				/*
 				OneBody.pos[0] = (double)ii*dx;
