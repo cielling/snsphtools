@@ -110,8 +110,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
     void *outbtab, *btab;
     void **addrs;
     int i, j, k, nvecs, nmembers;
-    int INCR=1, flag=0, num=14;
-    int Nbins = 100, bin;
+    int INCR=1, flag=0, num=15;
+    int Nbins = 200, bin;
+    int ident, countn = 0;
     int *inoffsets, *lines, *strides, *starts;
     int nlines = 1, nrecs;
     int index[num];
@@ -119,13 +120,13 @@ static void writestructs(SDF *sdfp, FILE *fp)
     char getmembrs[num][13];
     float **dm, *dv;
     float X_i[7], vbins[Nbins], mbins[Nbins][7], mtot[7];
-    float vmin=100, vmax=0, delv;
+    float vmin=1.e30, vmax=0, delv;
     float vx, vy, vz;
     float vel,mass,masscf,lengthcf,timecf;
     double x, y, z;
     /*make INCR and nlines user input */
 
-    for( k=0; k<(num-7); k++) mtot[k]=0.;
+    for( k=0; k<(num-8); k++) mtot[k]=0.;
 
     /* specify here which quantities to read in.
        note: a few things downstairs depend on the
@@ -139,11 +140,12 @@ static void writestructs(SDF *sdfp, FILE *fp)
     strcpy(getmembrs[6],"mass");
     strcpy(getmembrs[7],"f19"); /* H */
     strcpy(getmembrs[8],"f2"); /* O */
-    strcpy(getmembrs[9],"f3"); /* Si */
-    strcpy(getmembrs[10],"f5"); /* Fe */
-    strcpy(getmembrs[11],"f7"); /* Ni */
-    strcpy(getmembrs[12],"f15"); /* Fe */
-    strcpy(getmembrs[13],"f17"); /* Ni */
+    strcpy(getmembrs[9],"f3"); /* Ne */
+    strcpy(getmembrs[10],"f4"); /* Mg */
+    strcpy(getmembrs[11],"f5"); /* Si */
+    strcpy(getmembrs[12],"f7"); /* S */
+    strcpy(getmembrs[13],"f15"); /* Fe */
+    strcpy(getmembrs[14],"ident");
 
 
     nvecs = SDFnvecs(sdfp);
@@ -184,7 +186,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
 /*malloc memory space for the respective features of the struct-CIE*/
     dm = (float **)malloc(nrecs*sizeof(float*));
-    for( i = 0; i < nrecs; i++) dm[i] = (float *)malloc( (num-7) * sizeof( float ));
+    for( i = 0; i < nrecs; i++) dm[i] = (float *)malloc( (num-8) * sizeof( float ));
 
     dv = (float *)malloc(nrecs*sizeof(float));
 
@@ -247,28 +249,36 @@ static void writestructs(SDF *sdfp, FILE *fp)
         X_i[4] = *((float *)(btab + inoffsets[11]));
         X_i[5] = *((float *)(btab + inoffsets[12]));
         X_i[6] = *((float *)(btab + inoffsets[13]));
+        ident = *((int *)(btab + inoffsets[14]));
 
         vel = (vx*x+vy*y+vz*z)/sqrt(x*x+y*y+z*z)*lengthcf/timecf*1.e-5;
-        dv[j] = vel;
+        if(ident<1e6) {dv[j] = vel;} else {dv[j] = -9.9e4;}
 
         if( vel < vmin) vmin = vel;
         if( vel > vmax) vmax = vel;
 
+        if(ident < 1e6) {
+        countn++;
         /* running total of mass per element i */
-        for( k = 0; k < (num-7); k++) {
+        for( k = 0; k < (num-8); k++) {
             mtot[k] += mass*X_i[k];
             dm[j][k] = mass*X_i[k];
+        }
+        } else {
+           dm[j][k] = 0.;
         }
 
 
     }
+    printf("%d particles\n",countn);
+    printf("%.6e ", mtot[0]);
 
     delv = (vmax - vmin)/(float)(Nbins-1);
     printf("delta: %e, max: %e, min: %e\n", delv, vmax, vmin);
 
     for( k = 0; k<Nbins; k++) {
         vbins[k] = vmin+delv*(float)k;
-        for( j = 0; j < (num-7); j++ )
+        for( j = 0; j < (num-8); j++ )
             mbins[k][j] = 0.;
     }
 
@@ -277,18 +287,23 @@ static void writestructs(SDF *sdfp, FILE *fp)
         bin = locate(vbins, Nbins, dv[j]);
 
         /* sum up the mass in vel bin */
-        for( k = 0; k < (num-7); k++)
-            mbins[bin][k] += dm[j][k]/(mtot[k]*dv[j]);
+        for( k = 0; k < (num-8); k++)
+            mbins[bin][k] += dm[j][k]/(mtot[k]);
     }
 
+    fprintf(fp, "%14s ", "mtot=");
+    for( k = 8; k < num; ++k ) 
+        fprintf(fp, "%.6e ", mtot[k-8]);
+    fprintf(fp, "\n");
+    
     fprintf(fp, "%14s ", "vbins");
-    for(k = 7; k < num; k++)
+    for(k = 7; k < num-1; k++)
         fprintf(fp, "%14s ", getmembrs[k]);
     fprintf(fp, "\n");
 
     for( k = 0; k < Nbins; k++) {
         fprintf(fp, "%14e ", vbins[k]);
-        for(j = 0; j < (num-7); j++)
+        for(j = 0; j < (num-8); j++)
             fprintf(fp, "%14e ", mbins[k][j]);
         fprintf(fp, "\n");
     }

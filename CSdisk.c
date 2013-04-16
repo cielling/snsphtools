@@ -1,12 +1,15 @@
 /*
    PURPOSE:
-        to merge two SDF files into one file.
+        to place a circumstellar disk from ISM material in the second 
+	file into the ISM material in the first file.
         You can now enter the radius at which the two files should be
         merged, or -99. to just paste the second file onto the first.
 
    NOTE: the original files are not modified.
          - assumes currently that the body is the same, and the header from the 
            first file is written
+
+   SYNTAX: CDdisk <ISM.sdf> <disk-material.sdf> <out.sdf>
 
    DONE: 1) get list of columns in both SDF files
    DONE: 2) compare and exit if the headers are not the same
@@ -34,7 +37,7 @@ typedef union {
 
 static void initargs(int argc, char *argv[], SDF **sdfp1, SDF **sdfp2, FILE **fp);
 static void writeinit(FILE *fp);
-static void writescalars(SDF *sdfp1, FILE *fp, fpos_t *pos_npart, int max_npart);
+static void writescalars(SDF *sdfp1, FILE *fp, fpos_t *pos_npart);
 static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart);
 
 int main(int argc, char *argv[])
@@ -43,18 +46,11 @@ int main(int argc, char *argv[])
     SDF *sdfp2 = NULL;
     FILE *fp = NULL;
     fpos_t pos_npart;
-    int max_npart, npart1, npart2;
 
     initargs(argc, argv, &sdfp1, &sdfp2, &fp);
 
     writeinit(fp);
-
-    /* determine the max number of particles */
-    SDFgetint(sdfp1, "npart", &npart1);
-    SDFgetint(sdfp2, "npart", &npart2);
-    max_npart = npart1+npart2;
-
-    writescalars(sdfp1, fp, &pos_npart, max_npart);/*writes the header for the scalars (non-structs)*/
+    writescalars(sdfp1, fp, &pos_npart);/*writes the header for the scalars (non-structs)*/
     writestructs(sdfp1, sdfp2, fp, pos_npart);
 
     fclose(fp);
@@ -110,7 +106,7 @@ static void writeinit(FILE *fp)
     printf("hello\n");
 }
 
-static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int max_npart)
+static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart)
 {
     int i, nvecs;
     int flag = 0;
@@ -154,12 +150,9 @@ static void writescalars(SDF *sdfp, FILE *fp, fpos_t *pos_npart, int max_npart)
 /*write header file, line by line, as the appropriate data type-CE*/
 	switch (type) {
 	case SDF_INT:
-            if( !strncmp(vecs[i], "npart", strlen(vecs[i])) ) {
+            if( !strncmp(vecs[i], "npart", strlen(vecs[i])) )
                 fgetpos(fp, &pos);
-	        fprintf(fp, "int %s = %d;\n", vecs[i], max_npart);
-            } else {
-	        fprintf(fp, "int %s = %d;\n", vecs[i], datum.i);
-            }
+	    fprintf(fp, "int %s = %d;\n", vecs[i], datum.i);
 	    break;
 	case SDF_FLOAT:
 	    fprintf(fp, "float %s = %.7g;\n", vecs[i], datum.f);
@@ -191,7 +184,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     int ident, idindex, ident_last, ident_max, identnew;
     fpos_t pos1_npart;
     double x, y, z;
-    float radius, R0, maxR0;
+    float radius, R0, maxR0, disk_h;
     /*make INCR and nlines user input */
 
     nvecs1 = SDFnvecs(sdfp1);
@@ -227,9 +220,13 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 //        exit(1);
     }
 
-    printf("Enter merge radius or -99. : ");
+    printf("Enter disk radius: ");
     scanf("%f", &R0);
     printf(" %f\n", R0);
+
+    printf("Enter disk height: ");
+    scanf("%f", &disk_h);
+    printf(" %f\n", disk_h);
 
     printf("Enter max r: ");
     scanf("%f",&maxR0);
@@ -296,7 +293,7 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
 	}
     }
     fgetpos(fp, &pos1_npart);
-    fprintf(fp, "}[%d];\n", npart1+npart2); /*figure out how to save the location of the file position
+    fprintf(fp, "}[%d];\n", npart1); /*figure out how to save the location of the file position
                                        indicator, so we can come back and update npart -CE */
     fprintf(fp, "#\n");
     fprintf(fp, "# SDF-EOH\n");
@@ -305,7 +302,8 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     addrs[0] = (char *)btab;
     for (i=1; i< nmembers1; i++) addrs[i] = addrs[i-1] + SDFtype_sizes[ types[i-1] ];
 
-/*loop over each file consecutively in chunks of data, write that chunk to file*/
+    /* writing ISM material with cut out disk; assume whole ISM file is kept */
+    /* cut out a disk for r<R0 and z<disk_h */
 
     printf("getting file 1 .... ");
     for( i=0, countnpart = 0; i < npart1-1; i++) {
@@ -319,28 +317,24 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
-        radius = sqrt(x*x + y*y + z*z);
+        radius = sqrt(x*x + y*y);
 
 	/*dump the btab data into the file now-CE*/
-        if( radius < R0 ) {
+        if( radius > R0 || fabs(z) > disk_h ) {
             ident_last=ident;
             ident = *((int *)(btab + inoffsets[idindex]));
             if(ident_last==ident)printf("same ident\n");
+            identnew = countnpart; /* renumber the idents */
+            memcpy( btab + inoffsets[idindex], &identnew, sizeof(ident) );
 	    fwrite(btab, outstride, 1, fp);
-            countnpart++;
-        }
-        else if( R0 == -99.0 ) {
-            ident_last=ident;
-            ident = *((int *)(btab + inoffsets[idindex]));
-            if(ident_last==ident)printf("same ident\n");
-            fwrite(btab, outstride, 1, fp);
             countnpart++;
         }
 
     }
     newnpart = countnpart-1;
-    ident_max=ident;
+    ident_max=identnew;
 
+    /* add the disk */
     printf("got %d lines, last ident=%d\n",countnpart,ident_max);
     printf("getting file 2 .... ");
     for( i=0, countnpart = 0; i < npart2-1; i++) {
@@ -354,11 +348,10 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
         x = *((double *)(btab + inoffsets[0]));
         y = *((double *)(btab + inoffsets[1]));
         z = *((double *)(btab + inoffsets[2]));
-        radius = sqrt(x*x + y*y + z*z);
+        radius = sqrt(x*x + y*y);
 
 	/*dump the btab data into the file now-CE*/
-<<<<<<< HEAD
-        if( radius > R0 && radius <= maxR0) { /* radius is always greater than -99., no extra case needed*/
+        if( radius < R0 && fabs(z) < disk_h) { /* radius is always greater than -99., no extra case needed*/
             /* update the particle id, so it does not start at 1 again */
             ident_last=ident;
             ident = *((int *)(btab + inoffsets[idindex]));
@@ -366,13 +359,6 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
             ++countnpart;
             identnew = countnpart + ident_max; /* so there aren't duplicate particle ids */
             memcpy( btab + inoffsets[idindex], &identnew, sizeof(ident) );
-=======
-        if( radius > R0 ) { /* radius is always greater than -99., no extra case needed*/
-            /* update the particle id, so it does not start at 1 again */
-            ident = *((int *)(btab + inoffsets[idindex]));
-            ident += npart1; /* so there aren't duplicate particle ids */
-            memcpy( btab + inoffsets[idindex], &ident, sizeof(ident) );
->>>>>>> 3a4c86ec7aa6bbf20aaf19ca3ef8af6cdb559253
 
 	    fwrite(btab, outstride, 1, fp);
         } 
@@ -381,26 +367,12 @@ static void writestructs(SDF *sdfp1, SDF *sdfp2, FILE *fp, fpos_t pos_npart)
     newnpart += countnpart-1;
     printf("got %d lines\n",countnpart);
 
-    /* update npart to the new value, adjust for differing number of digits */
-    if( (npart1+npart2)/newnpart >= 100 ) {
-        fsetpos(fp, &pos1_npart);
-        fprintf(fp, "} [%d]; ", newnpart);
-    
-        fsetpos(fp, &pos_npart);
-        fprintf(fp, "int %s = %d;  ", "npart", newnpart);
-    } else if( (npart1+npart2)/newnpart >= 10 ) {
-        fsetpos(fp, &pos1_npart);
-        fprintf(fp, "}[%d]; ", newnpart);
-    
-        fsetpos(fp, &pos_npart);
-        fprintf(fp, "int %s = %d; ", "npart", newnpart);
-    } else {
-        fsetpos(fp, &pos1_npart);
-        fprintf(fp, "}[%d];", newnpart);
-    
-        fsetpos(fp, &pos_npart);
-        fprintf(fp, "int %s = %d;", "npart", newnpart);
-    }
+    /* update npart to the new value */
+    fsetpos(fp, &pos1_npart);
+    fprintf(fp, "}[%d];", newnpart);
+
+    fsetpos(fp, &pos_npart);
+    fprintf(fp, "int %s = %d;", "npart", newnpart);
 
 /*and we're done! clean up now -CE: if it ever works*/
 /*    free(members);

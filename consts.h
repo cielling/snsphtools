@@ -4,9 +4,14 @@
  * in  user-units, and convert FROM CGS TO USER-UNITS. They are 
  * set in the .ctl file. ADD */
 
+/*
 double massCF = 1.9889e27;
 double lengthCF = 6.955e10;
 double timeCF = 100.;
+*/
+double massCF = 1.9889e25;
+double lengthCF = 1.500e12;
+double timeCF = 3.15576e5;
 
 #ifndef CONSTS
 #define CONSTS

@@ -1,17 +1,15 @@
 /*
    PURPOSE:
-	to add a velocity asymmetry to an sdf file
-        This version should also work for large files, since it reads in the
-        sdf file line-by-line.
+    to set the boundary bit of "surface" particles that should be kept in place.
 
    COMPILE:
-    with Makefile2. un-comment appropriate lines.
+    make ARCH=<arch> [CC=icc] PROGS=setboundarybit
     This routine needs some libraries from the tree code and SDF routines,
     so make sure that TREEHOME is set, and the tree code (SNSPH) compiled
     once for serial use (i.e. without PAROS flag).
 
    RUN:
-    addvel <in-file.sdf> <out-file.sdf>
+    setboundarybit <in-file.sdf> <out-file.sdf> onoff-flag
 
    METHOD:
 	@ read in header of <in-file.sdf>
@@ -48,12 +46,7 @@ static void writeinit(FILE *fp);
 static void writescalars(SDF *sdfp, FILE *fp);
 static void writestructs(SDF *sdfp, FILE *fp);
 
-static const int NISO = 22;
-static int asym_u = 0;
-
-void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnwi, FILE *frp);
-
-double get_ye(float abundarr[], int nparr[], int nnarr[], int Niso);
+int onoff;
 
 int main(int argc, char *argv[])
 {
@@ -77,7 +70,7 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
     char input;
 
     if (argc != 4) {
-	fprintf(stderr, "Usage: %s SDFfile outfile asym_u\n", argv[0]);
+	fprintf(stderr, "Usage: %s SDFfile outfile onoff\n", argv[0]);
 	exit(1);
     }
 
@@ -100,8 +93,7 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
 	exit(errno);
     }
 
-    asym_u = atoi(argv[3]);
-    if(asym_u == 1) printf("calculating asymmetry in u also\n");
+    onoff = atoi(argv[3]);
 }
 
 static void writeinit(FILE *fp)
@@ -175,56 +167,26 @@ static void writescalars(SDF *sdfp, FILE *fp)
 
 static void writestructs(SDF *sdfp, FILE *fp)
 {
-    FILE *frp = NULL;
     int i, j, nvecs, nmembers;
-    int len, flag = 0;
+    int len, counter, flag = 0;
     int nrecs;
-    int ixvel, iu, ih;
+    int ixvel, iu, ih, ident;
     int *strides, *nobjs, *starts, *inoffsets;
     char **vecs, **members;
     SDF_type_t *types;
     size_t stride = 0;
     void *btab;
     void **addrs;
-    double alpha, beta, vfactor, cos_angle;
-    float set_radius;
+    float set_radius, R0, h;
     double x, y, z, radius;
-    float vx, vy, vz, vx2, vy2, vz2, v_r, u;
 
-    frp = fopen("/work/01834/cielling/log.out", "w");
-    if(!frp) printf("error opening log file!\n");
 
-    /* j2 geometry; from Hungerford, Fryer, & Warren 2003 */
-/*
-    alpha = sqrt(3./7.);
-    beta = sqrt(3./7.);
-*/
-
-    /* j4 geometry */
-/*
-    alpha = sqrt(2./7.)-0.2;
-    beta = sqrt(9./7.);
-*/
-
-    /* e2 geometry */
-/*
-    alpha = 4./3.;
-    beta = -2./3.;
-*/
-
-    /* e4 geometry */
-    /* subtrahend is an attempt to conserve energy better */
-    alpha = 8./5. -0.05;
-    beta = -6./5.;
-
-    printf("set_radius: enter 0 if set by vr:");
+    printf("set_radius: enter 0 if set by vr, -1 if using R0:");
     scanf("%f",&set_radius);
     printf("%f\n",set_radius);
 
-    vfactor = 1.00;
-
     SDFgetint(sdfp, "npart", &nrecs);
-    fprintf(stdout,"%d particles\n", nrecs);
+    SDFgetfloat(sdfp, "R0", &R0);
 
     nvecs = SDFnvecs(sdfp);
     vecs = SDFvecnames(sdfp);
@@ -234,7 +196,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
         if (strncmp(vecs[i], "x", strlen(vecs[i])) == 0) flag = 1;
 	if (flag) ++nmembers;
     }
-    fprintf(stdout,"nmembers = %d\n",nmembers);
 
 
     /*malloc memory space for the respective features of the struct-CIE*/
@@ -259,8 +220,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
 				      NobjInitial */
 	    types[nmembers] = SDFtype(members[nmembers], sdfp);
 	    inoffsets[nmembers] = stride;
-            if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) ixvel = nmembers;
-            if (strncmp(vecs[i], "u", strlen(vecs[i])) == 0) iu = nmembers;
+            if (strncmp(vecs[i], "ident", strlen(vecs[i])) == 0) ixvel = nmembers;
             if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) ih = nmembers;
 	    stride += SDFtype_sizes[types[nmembers]];
 
@@ -268,7 +228,6 @@ static void writestructs(SDF *sdfp, FILE *fp)
 	}
     }
 
-    fprintf(stdout,"vx at %d\n",ixvel);
 
     btab = (void *)malloc(stride);
 
@@ -314,44 +273,37 @@ static void writestructs(SDF *sdfp, FILE *fp)
         y = *(double *)(btab + inoffsets[1]);
         z = *(double *)(btab + inoffsets[2]);
         radius = sqrt( x*x + y*y + z*z );
-        if( beta < 0.) 
-            cos_angle = fabs(x)/radius; /* equatorial asymmetry */
-        else 
-            cos_angle = fabs(z)/radius; /* polar (jet) asymmetry */
+        ident = *(int *)(btab + inoffsets[ixvel]);
 
-        /* get velocities */
-        vx = *(float *)(btab + inoffsets[ixvel]);
-        vy = *(float *)(btab + inoffsets[ixvel+1]);
-        vz = *(float *)(btab + inoffsets[ixvel+2]);
-        v_r = ((vx*x)+(vy*y)+(vz*z))/radius;
 
-        /* get internal energy */
-        if(asym_u == 1) {
-            u = *(float *)(btab + inoffsets[iu]);
+        if( set_radius < 0.0 ) {
             h = *(float *)(btab + inoffsets[ih]);
-            h3 = h*h*h;
-        }
-
-        theta = (float)(fabs(z*z)/(radius*radius)); /* negative for eq. asymmetry */
-
-        /* calculate the velocity asymmetry */
-        /* only for expanding velocities */
-        if( (v_r > 0.0 && set_radius == 0)
-            || (radius < set_radius)) {
-            /* jet geometry */
-            vx2 = (alpha + beta * cos_angle) * vx;
-            vy2 = (alpha + beta * cos_angle) * vy;
-            vz2 = (alpha + beta * cos_angle) * vz;
-            if(asym_u == 1) {
-                u = (alpha + beta * cos_angle) * sqrt(u);
-                u = u*u; /* to conserve energy, since k.e. ~ v^2 and using same formula */
-                memcpy(btab + inoffsets[iu], &u, SDFtype_sizes[ types[iu] ]);
+            if( radius > (R0 - 2.5*h) ) {
+                switch (onoff) {
+                case 1: /* turn on */
+                    ident = ident | (1<<30);
+                    break;
+                case 0: /* turn off */
+                    ident = ident & ~(1<<30);
+                    break;
+                /*default:*/
+                    /* do nothing. alternatively, could toggle the bit */
+                }
             }
-
-            memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
-            memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
-            memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
+        } else if( set_radius <= radius) {
+           switch (onoff) {
+           case 1: /* turn on */
+               ident = ident | (1<<30);
+               break;
+           case 0: /* turn off */
+               ident = ident & ~(1<<30);
+               break;
+           /*default:*/
+               /* do nothing. alternatively, could toggle the bit */
+           }
         }
+
+        memcpy(btab + inoffsets[ixvel], &ident, SDFtype_sizes[ types[ixvel] ]);
 
         /*dump the outbtab data into the file now-CIE*/
         fwrite(btab, stride, 1, fp);
@@ -368,118 +320,4 @@ static void writestructs(SDF *sdfp, FILE *fp)
     free(inoffsets);
 
     free(btab);
-}
-
-
-
-double get_ye(float abundarr[], int nparr[], int nnarr[], int Niso) {
-    int i;
-    double Ye;
-    Ye = 0.0;
-    for( i=0; i<Niso; i++) {
-        Ye += (double)abundarr[i] / (double)( nparr[i]+nnarr[i] ) * (double)nparr[i];
-    }
-    return Ye;
-}
-
-
-void renorm(int want[][NISO], float newabund[], float abundarr[], int nparr[], int nnarr[], int Niso, int Nnw, FILE *frp) {
-    int i, j, is_in_arr, adjust;
-    int jl, jm, ju, fe56, count;
-    double Ye_old, Ye_new, sum, factor, factor1, eps=1.e-4;
-
-    for( i=0; i<Nnw; i++) newabund[i] = 0.0;
-
-    for( j=0; j<Niso; j++) {
-
-        is_in_arr = 0;
-
-        for( i=0; i<Nnw; i++) {
-            if((want[0][i] == nparr[j]) && (want[1][i] == nnarr[j])) {
-                newabund[i] += abundarr[j];
-                is_in_arr = 1;
-            }
-            if((want[0][i] == 26) && (want[1][i] == 30)) fe56 = i;
-        }
-
-        if(is_in_arr == 0) {
-            /* figure out where we are */
-            if (nparr[j] >= want[0][Nnw-1])
-                jl = Nnw-1;
-            else if (nparr[j] <= want[0][0])
-                jl = 0;
-            else {
-                ju = Nnw - 1;
-                jl = 0;
-                while (ju-jl > 1) {
-                   jm = (ju+jl) >> 1;
-                   if ((nparr[j] >= want[0][jm]) == (want[0][Nnw-1] >= want[0][0]))
-                      jl=jm;
-                   else
-                      ju=jm;
-                }
-            }
-
-            //printf("index: %3d, isotope: p=%2d n=%2d; put in ",jl,nparr[j],nnarr[j]);
-
-            /* determine appropriate abundance bin to stuff isotope into */
-            if(jl == 0) {
-                newabund[jl] += abundarr[j];
-            } else if(jl == Nnw-1) {
-                newabund[jl] += abundarr[j];
-            } else {
-                if(want[0][jl] >= nparr[j]) {
-                    if((want[0][jl]-nparr[j]) <= (nparr[j]-want[0][jl-1])) {
-                        newabund[jl] += abundarr[j];
-                        //printf("%2d: p=%2d\n",jl,want[0][jl]);
-                    } else {
-                        newabund[jl-1] += abundarr[j];
-                        //printf("%2d: p=%2d\n",jl-1,want[0][jl-1]);
-                    }
-                } else {
-                    if((want[0][jl+1]-nparr[j]) <= (nparr[j]-want[0][jl])) {
-                        newabund[jl+1] += abundarr[j];
-                        //printf("%2d: p=%2d\n",jl+1,want[0][jl+1]);
-                    } else {
-                        newabund[jl] += abundarr[j];
-                        //printf("%2d: p=%2d\n",jl,want[0][jl]);
-                    }
-                }
-            }
-        }
-    }
-
-    sum = 0.0;
-    for( i=0; i<Nnw; i++) sum += newabund[i];
-    if(fabs(sum - 1.0) > 1.e-3) fprintf(frp, "warning: mass fractions don't sum to 1: %E\n",sum);
-
-    /* check and adjust the Ye's */
-    count = 0;
-    do {
-        Ye_old = get_ye(abundarr, nparr, nnarr, Niso);
-        Ye_new = get_ye(newabund, want[0], want[1], Nnw);
-        if(fabs(Ye_old/Ye_new - 1.0) > eps) {
-        /* new Ye too small: decrease Fe56. new Ye too large: increase Fe56 */
-            factor = Ye_new/Ye_old;
-            factor1 = ( (1.0 - factor*newabund[fe56]) / (1.0-newabund[fe56]));
-            newabund[fe56] *= factor;
-            for( i=0; i<Nnw; i++) {
-                if(i != fe56) {
-                   newabund[i] *= factor1;
-                   if(newabund[i] < 0.000) fprintf(frp, "warning: negative abundance for %2d %2dafter %d iterations!\n",want[0][i],want[1][i],count);
-                }
-            }
-            adjust = 1;
-            count++;
-        } else {
-            adjust = 0;
-        }
-        if(count > (int)(2.0/eps)) adjust = 0;
-            adjust = 0;
-    } while (adjust == 1);
-    fprintf(frp, "adjusted Ye from %E to %E\n",Ye_old, Ye_new);
-
-    sum = 0.0;
-    for( i=0; i<Nnw; i++) sum += newabund[i];
-    if(fabs(sum - 1.0) > 1.e-3) fprintf(frp, "renorm warning: mass fractions don't sum to 1: %E\n",sum);
 }

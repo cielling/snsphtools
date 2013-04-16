@@ -100,9 +100,9 @@ static void initargs(int argc, char *argv[], SDF **sdfp, FILE **fp)
     }
    
     perturb_which = atoi(argv[3]);
-    if(perturb_which == 0) printf("adding random perturbation to density\n");
+    if(perturb_which == 0) printf("adding random perturbation to density (via h)\n");
     else if(perturb_which == 1) printf("adding random perturbation to velocity\n");
-    else if(perturb_which == 2) printf("adding random perturbation to density and velocity\n");
+    else if(perturb_which == 2) printf("adding random perturbation to density (via h) and velocity\n");
 }
 
 static void writeinit(FILE *fp)
@@ -180,7 +180,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     int i, j, nvecs, nmembers;
     int len, counter, flag = 0;
     int nrecs;
-    int ixvel, irho;
+    int ixvel, ih;
     int *strides, *nobjs, *starts, *inoffsets;
     char **vecs, **members;
     SDF_type_t *types;
@@ -190,7 +190,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     double alpha, beta, vfactor;
     float set_radius;
     double x, y, z, radius;
-    float vx, vy, vz, vx2, vy2, vz2, rho, rho2, perturb;
+    float vx, vy, vz, vx2, vy2, vz2, h, h3, perturb;
 
     frp = fopen("log.out", "w");
     if(!frp) printf("error opening log file!\n");
@@ -238,7 +238,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
             types[nmembers] = SDFtype(members[nmembers], sdfp);
             inoffsets[nmembers] = stride;
             if (strncmp(vecs[i], "vx", strlen(vecs[i])) == 0) ixvel = nmembers;
-            if (strncmp(vecs[i], "rho", strlen(vecs[i])) == 0) irho = nmembers;
+            if (strncmp(vecs[i], "h", strlen(vecs[i])) == 0) ih = nmembers;
             stride += SDFtype_sizes[types[nmembers]];
 
             ++nmembers;
@@ -246,7 +246,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
     }
 
     fprintf(frp,"vx at %d\n",ixvel);
-    fprintf(frp,"rho at %d\n",irho);
+    fprintf(frp,"h at %d\n",ih);
 
     btab = (void *)malloc(stride);
 
@@ -299,7 +299,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
         vx = *(float *)(btab + inoffsets[ixvel]);
         vy = *(float *)(btab + inoffsets[ixvel+1]);
         vz = *(float *)(btab + inoffsets[ixvel+2]);
-        rho = *(float *)(btab + inoffsets[irho]);
+        h = *(float *)(btab + inoffsets[ih]);
 
         /* calculate the velocity asymmetry */
         /* only for expanding velocities */
@@ -308,9 +308,9 @@ static void writestructs(SDF *sdfp, FILE *fp)
 
             if(perturb_which==0 || perturb_which == 2){ /* perturbing velocity */
                 perturb = (double)rand()/(double)RAND_MAX-0.5;
-                vx2 = vx*(1.+perturb/10.);
-                vy2 = vy*(1.+perturb/10.);
-                vz2 = vz*(1.+perturb/10.);
+                vx2 = vx*(1.+perturb/5.);
+                vy2 = vy*(1.+perturb/5.);
+                vz2 = vz*(1.+perturb/5.);
                 memcpy(btab + inoffsets[ixvel], &vx2, SDFtype_sizes[ types[ixvel] ]);
                 memcpy(btab + inoffsets[ixvel+1], &vy2, SDFtype_sizes[ types[ixvel+1] ]);
                 memcpy(btab + inoffsets[ixvel+2], &vz2, SDFtype_sizes[ types[ixvel+2] ]);
@@ -320,8 +320,10 @@ static void writestructs(SDF *sdfp, FILE *fp)
             if(perturb_which == 1 || perturb_which == 2) { /* perturbing density */
 
                 perturb = (double)rand()/(double)RAND_MAX-0.5;
-                rho2 = rho* (1.+perturb/5.);
-                memcpy(btab + inoffsets[irho ], &rho2, SDFtype_sizes[ types[ irho ] ]);
+                h3 = h*h*h;
+                h3 = h3* (1.+perturb/5.);
+                h = pow(h, 0.33333333333333333333);
+                memcpy(btab + inoffsets[ih ], &h, SDFtype_sizes[ types[ ih ] ]);
 
             }
 
