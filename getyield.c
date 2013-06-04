@@ -369,8 +369,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     for( i=0; i<countlines; ++i) {
         /* initial yield-array to zero, since it carries a cumulative total */
-        yield[j]=0.;
-        oldyield[j] = 0.;
+        yield[i]=0.;
+        oldyield[i] = 0.;
     }
 
     btab = (void *)malloc(outstride * nlines);
@@ -418,16 +418,12 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         if( postprocd==0 ) {
             for(k = 3; k< counti; k++) {
                 Xel[k-3] = *((float *)(btab + inoffsets[k]) );
-                if( rho >= 0.0e-0) {
-                    yield[k-3] += Xel[k-3] * mass * massCF;
-                }
+                yield[k-3] += Xel[k-3] * mass * massCF;
             }
         } else {
             for( k=3; k<counti; k++ ) {
                 Xel[k-3] = *((float *)(btab + inoffsets[k]) );
-                if( rho >= 0.0e-0) {
-                    oldyield[k-3] += Xel[k-3] * mass * massCF;
-                }
+                oldyield[k-3] += Xel[k-3] * mass * massCF;
             }
         }
 
