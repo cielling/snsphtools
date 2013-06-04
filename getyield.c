@@ -436,13 +436,13 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "orig", "total");
         for(k = 0; k < counti-3; k++) {
-            fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ iso_index[k]-index[4] ],
-                SDF_iso_arr[1][ iso_index[k]-index[4] ], yield[k]);
+            fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ iso_index[k+3]-index[4] ],
+                SDF_iso_arr[1][ iso_index[k+3]-index[4] ], yield[k]);
             if(!(yield[k]!=yield[k]))
                 total += yield[k];
             for(ii = 0; ii < counti-3; ii++) {
-                if((SDF_iso_arr[0][ iso_index[k]-index[2] ] == isotop[0][ii]) &&
-                    (SDF_iso_arr[1][ iso_index[k]-index[2] ] == isotop[1][ii]) ) {
+                if((SDF_iso_arr[0][ iso_index[k+3]-index[2] ] == isotop[0][ii]) &&
+                    (SDF_iso_arr[1][ iso_index[k+3]-index[2] ] == isotop[1][ii]) ) {
                     fprintf(fp, "\t%14.6e\t%14.6e\t%14.6e\n", ppyields[ii], oldyield[ii], (yield[k]+ppyields[ii]));
                 }
             }
