@@ -322,7 +322,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     fprintf(stdout, "counti: %d\n",counti);
 
-    /* sort, to put isotope indices in same order as in the SDF */
+    /* bubble- sort, to put isotope indices in same order as in the SDF */
     if(counti>3) {
         for(i = 3; i < counti; i++) {
             for(j = 3; j < counti-1; j++ ) {
@@ -367,7 +367,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     //    instride += SDFtype_sizes[ SDFtype(vecs[i], sdfp) ];
     instride = outstride;
 
-    for( i=0; i<n_iso; ++i) {
+    for( i=0; i<countlines; ++i) {
         /* initial yield-array to zero, since it carries a cumulative total */
         yield[j]=0.;
         oldyield[j] = 0.;
@@ -422,7 +422,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
                 }
             }
         } else {
-            for( k=0; k<counti; k++ ) {
+            for( k=3; k<counti; k++ ) {
                 Xel[k-3] = *((float *)(btab + inoffsets[k]) );
                 if( rho >= 0.0e-0) {
                     oldyield[k-3] += Xel[k-3] * mass * massCF;
@@ -436,7 +436,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "orig", "total");
         for(k = 0; k < counti-3; k++) {
-            ndx = iso_index[k+3]-index[4];
+            ndx = iso_index[k+3]-index[4]; /* b/c we sorted this upstairs */
+            fprintf(stdout, "k= %d, iso_index = %d ndx = %d\n", k, iso_index[k+3], ndx);
             fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ ndx ],
                 SDF_iso_arr[1][ ndx ], yield[k]);
             if(!(yield[k]!=yield[k]))
@@ -444,7 +445,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
             for(ii = 0; ii < countlines; ii++) {
                 if((SDF_iso_arr[0][ ndx ] == isotop[0][ii]) &&
                     (SDF_iso_arr[1][ ndx ] == isotop[1][ii]) ) {
-                    fprintf(fp, "\t%14.6e\t%14.6e\t%14.6e\n", ppyields[ii], oldyield[ii], (yield[k]+ppyields[ii]));
+                    fprintf(fp, "\t%14.6e\t%14.6e\t%14.6e\n", ppyields[ii], oldyield[k], (yield[k]+ppyields[ii]));
                 }
             }
         }
