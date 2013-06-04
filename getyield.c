@@ -212,7 +212,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     int *inoffsets, *lines, *strides, *starts;
     int INCR=1, flag=0;
     int nlines = 1, nrecs;
-    int index[6], counti, ident;
+    int index[6], counti, countlines, ident, ndx;
     int n_iso, **SDF_iso_arr, *iso_index;
     float rho, *yield, mass, *Xel, massCF, temp, total;
     float *oldyield;
@@ -280,24 +280,24 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
        that corresponds to the given (np,nn) ... */
     }
 
-    counti = 0;
+    countlines = 0;
     while( !feof(fp2) ){
         fgets(line, 100, fp2);
-        counti++;
+        countlines++;
     }
     rewind(fp2);
 
-    printf("getting %d isotopes\n",--counti);
+    printf("getting %d isotopes\n",--countlines);
     //counti = countis+1;
 
     isotop = (int **)malloc( 2*sizeof(int *) );
-    isotop[0] = (int *)malloc( counti*sizeof(int) );
-    isotop[1] = (int *)malloc( counti*sizeof(int) );
+    isotop[0] = (int *)malloc( countlines*sizeof(int) );
+    isotop[1] = (int *)malloc( countlines*sizeof(int) );
 
-    iso_index = (int *)malloc((counti+3)*sizeof(int));
-    Xel = (float *)malloc( counti*sizeof(float) );
-    yield = (float *)malloc( counti*sizeof(float) );
-    oldyield = (float *)malloc( counti*sizeof(float) );
+    iso_index = (int *)malloc((countlines+3)*sizeof(int));
+    Xel = (float *)malloc( countlines*sizeof(float) );
+    yield = (float *)malloc( countlines*sizeof(float) );
+    oldyield = (float *)malloc( countlines*sizeof(float) );
 
     for( i = 0; i < 3; ++i )
         iso_index[i] = index[i+1];
@@ -436,13 +436,14 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "orig", "total");
         for(k = 0; k < counti-3; k++) {
-            fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ iso_index[k+3]-index[4] ],
-                SDF_iso_arr[1][ iso_index[k+3]-index[4] ], yield[k]);
+            ndx = iso_index[k+3]-index[4];
+            fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ ndx ],
+                SDF_iso_arr[1][ ndx ], yield[k]);
             if(!(yield[k]!=yield[k]))
                 total += yield[k];
-            for(ii = 0; ii < counti-3; ii++) {
-                if((SDF_iso_arr[0][ iso_index[k+3]-index[2] ] == isotop[0][ii]) &&
-                    (SDF_iso_arr[1][ iso_index[k+3]-index[2] ] == isotop[1][ii]) ) {
+            for(ii = 0; ii < countlines; ii++) {
+                if((SDF_iso_arr[0][ ndx ] == isotop[0][ii]) &&
+                    (SDF_iso_arr[1][ ndx ] == isotop[1][ii]) ) {
                     fprintf(fp, "\t%14.6e\t%14.6e\t%14.6e\n", ppyields[ii], oldyield[ii], (yield[k]+ppyields[ii]));
                 }
             }
