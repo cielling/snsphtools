@@ -320,7 +320,6 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         ii++;
     }
 
-    --counti;
     fprintf(stdout, "counti: %d\n",counti);
 
     /* sort, to put isotope indices in same order as in the SDF */
@@ -395,7 +394,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         for( i = 0; i < nmembers; i++)
             starts[i] = j;
 
-        if(!(j%50000)) printf("iter: %d\n",j);
+        if(!(j%50000)) printf(".");
         SDFseekrdvecsarr(sdfp, nmembers, members, starts, lines, addrs, strides);
             /*temporary solution*/
 
@@ -465,15 +464,15 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     free(SDF_iso_arr[0]);
     free(SDF_iso_arr[1]);
     free(SDF_iso_arr);
-    free(yield);
-    free(Xel);
-    free(oldyield);
-    free(pnames);
-    free(nnames);
-    free(ppyields);
-    free(isotope[1]);
-    free(isotope[0]);
-    free(isotope);
+    //free(yield);
+    //free(Xel);
+    //free(oldyield);
+    //free(pnames);
+    //free(nnames);
+    //free(ppyields);
+    //free(isotope[1]);
+    //free(isotope[0]);
+    //free(isotope);
 
 }
 
