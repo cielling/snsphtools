@@ -387,10 +387,10 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     printf("reading in %d lines ...\n",nrecs);
 
 
-    ii = 0;
+    total = 0.;
 
     /*try reading in one line at a time */
-    for( j = 0; j < nrecs; j++) {
+    for(ii = 0, j = 0; j < nrecs; j++) {
         for( i = 0; i < nmembers; i++)
             starts[i] = j;
 
@@ -401,7 +401,8 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
         mass = *((float *)(btab + inoffsets[0]));
         ident = *((int *)(btab + inoffsets[1]));
         rho = *((float *)(btab + inoffsets[2]));
-        //if(!(j%50000)) printf("rho: %d\n",npartids);
+
+        total += mass;
 
         postprocd = 0; /* only add abundances of non-post proc'd particles */
 
@@ -432,16 +433,11 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     }
 
-    total = 0.;
-
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "orig", "total");
         for(k = 0; k < counti-3; k++) {
             ndx = iso_index[k+3]-index[4]; /* b/c we sorted this upstairs */
-            fprintf(stdout, "k= %d, iso_index = %d ndx = %d\n", k, iso_index[k+3], ndx);
             fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ ndx ],
                 SDF_iso_arr[1][ ndx ], yield[k]);
-            if(!(yield[k]!=yield[k]))
-                total += yield[k];
             for(ii = 0; ii < countlines; ii++) {
                 if((SDF_iso_arr[0][ ndx ] == isotop[0][ii]) &&
                     (SDF_iso_arr[1][ ndx ] == isotop[1][ii]) ) {
@@ -449,7 +445,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
                 }
             }
         }
-        fprintf(fp, "\n\nunprocessed mass: %e\n",total);
+        fprintf(fp, "\n\ntotal mass: %e\n",total);
 
         printf("total mass: %e\n",total);
 
