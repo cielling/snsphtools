@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
     SDFclose(sdfp);
 
     free(partids);
+    free(ppyields);
 
     return 0;
 }
@@ -192,6 +193,9 @@ int read_se_yields(char *argv[], int **partid, float **ppyields, FILE *fp2)
 
 
     fclose(fp);
+    free(isotope[0]);
+    free(isotope[1]);
+    free(isotope);
 
     return nlines;
 }
@@ -452,10 +456,15 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
 /*and we're done! clean up now -CE: if it ever works*/
 /*    free(members);
-    free(btab);
     free(addrs);
 */
+    free(btab);
+    free(pnames);
+    free(nnames);
     /*free(outbtab);*/
+    free(members);
+    free(addrs);
+    free(starts);
     free(lines);
     free(types);
     free(inoffsets);
@@ -463,15 +472,13 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     free(SDF_iso_arr[0]);
     free(SDF_iso_arr[1]);
     free(SDF_iso_arr);
-    //free(yield);
-    //free(Xel);
-    //free(oldyield);
-    //free(pnames);
-    //free(nnames);
-    //free(ppyields);
-    //free(isotope[1]);
-    //free(isotope[0]);
-    //free(isotope);
+    free(yield);
+    free(Xel);
+    free(oldyield);
+    free(iso_index);
+    free(isotop[1]);
+    free(isotop[0]);
+    free(isotop);
 
 }
 
