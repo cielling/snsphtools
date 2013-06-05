@@ -216,7 +216,7 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     int n_iso, **SDF_iso_arr, *iso_index;
     float rho, *yield, mass, *Xel, massCF, temp, total;
     float *oldyield;
-    int **isotop;
+    int **isotop, found;
     /*make INCR and nlines user input */
 
 /* this does not attempt to load the whole file into memory, does it? -CE */
@@ -307,7 +307,6 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     while( !feof(fp2) ){
         fscanf(fp2, "%d %d", &isotop[0][ii], &isotop[1][ii]);
-        //fscanf(fp2, "%*d %*d");
 
         for(k = 0; k < n_iso; k++) {
             /* find isotope index in the SDF struct */
@@ -349,8 +348,6 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
 
     flag = 0;
     for (nmembers = 0, outstride = 0, j = 0; j < counti; ++j) {
-        //members[j] = (char*)malloc( (strlen(vecs[iso_index[0]])+1)*sizeof(char) );
-        //strcpy( members[j], vecs[iso_index[j]] );
         members[j] = vecs[iso_index[j]]; /* appears to be a memory leak. why? */
         lines[j] = 1;//INCR;
         starts[j] = 0;
@@ -430,16 +427,24 @@ static void writestructs(SDF *sdfp, FILE *fp, FILE *fp2, int *partids, int npart
     }
 
     fprintf(fp, "%4s %4s %14s\t%14s\t%14s\t%14s\n", "p", "n", "un-proc'd", "proc'd", "orig", "total");
-        for(k = 0; k < counti-3; k++) {
-            ndx = iso_index[k+3]-index[4]; /* b/c we sorted this upstairs */
-            fprintf(fp, "%4d %4d %14.6e", SDF_iso_arr[0][ ndx ],
-                SDF_iso_arr[1][ ndx ], yield[k]);
-            for(ii = 0; ii < countlines; ii++) {
+        for( ii = 0; ii < countlines; ii++ ) {
+                found = 0;
+            for( k = 0; k < counti-3; k++) {
+                ndx = iso_index[k+3] - index[4];
                 if((SDF_iso_arr[0][ ndx ] == isotop[0][ii]) &&
                     (SDF_iso_arr[1][ ndx ] == isotop[1][ii]) ) {
-                    fprintf(fp, "\t%14.6e\t%14.6e\t%14.6e\n", ppyields[ii], oldyield[k], (yield[k]+ppyields[ii]));
-                }
+                    fprintf(fp, "%4d %4d %14.6e\t%14.6e\t%14.6e\t%14.6e\n", 
+                            SDF_iso_arr[0][ ndx ], SDF_iso_arr[1][ ndx ], yield[k],
+                            ppyields[ii], oldyield[k], (yield[k]+ppyields[ii]));
+                    found = 1;
+                    break;
+                } 
             }
+                if( found == 0) {
+                    fprintf(fp, "%4d %4d %14.6e\t%14.6e\t%14.6e\t%14.6e\n", 
+                            isotop[0][ii], isotop[1][ii], 0.0,
+                            ppyields[ii], 0.0, ppyields[ii]);
+                } 
         }
         fprintf(fp, "\n\ntotal mass: %e\n",total);
 
