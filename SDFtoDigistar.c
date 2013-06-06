@@ -176,6 +176,7 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
     float vx, vy, vz, vx1, vy1, vz1, dvel;
     float offs_x, offs_y, offs_z;
     float b_x, b_y, b_z, b_x1, b_y1, b_z1;
+    float red, green, blue, intensity;
 
     printf("first_file is %d\n", first_file);
 
@@ -314,18 +315,25 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
 
         /* the already accreted particles */
 	if(first_file == 0) {
+            red = 0.;
+            green = 1.;
+            blue = 0.;
+            intensity = 1.0;
+
             while(idents[k] < ident) {
                /* format: D/V x y z intensity r g b */
                fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                       b_x, b_y, b_z, 1.f, 0.f, 1.f, 1.f);
+                       b_x, b_y, b_z, intensity, red, green, blue);
                fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                       b_x1, b_y1, b_z1, 1.f, 0.f, 1.f, 1.f);
+                       b_x1, b_y1, b_z1, intensity, red, green, blue);
 	        ++k;
             }
         }
 
         /* put particles absorbed in sdfp1 at the origin; read in particles */
 	while(ident < ident1) {
+            red = 1;
+            green = 0;
             /* the "offset vector". = x_n*(1+1/60) - x_(n+1)/60; for 60 fps */
             /* in this case, x+1 is 0,0,0 since particles are being accreted */
             offs_x =b_x1;// x*1.01666666666666;
@@ -334,9 +342,9 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
 
 	    /* write initial position */
             fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    x, -1.0*y, z, 1.f, 0.f, 1.f, 1.f);
+                    x, -1.0*y, z, intensity, red, green, blue);
             fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                    offs_x, -1.0*offs_y, offs_z, 1.f, 0.f, 1.f, 1.f);
+                    offs_x, -1.0*offs_y, offs_z, intensity, red, green, blue);
 
             ++j;
             ++k;
@@ -363,10 +371,14 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
             /* in case any particles are accreted between ident and ident1 */
             if(first_file == 0) {
                 while(idents[k] < ident) {
+                    red = 0.;
+                    green = 1.;
                     fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                       b_x, b_y, b_z, 1.f, 0.f, 1.f, 1.f);
+                       b_x, b_y, b_z, intensity, red, green, blue);
+                    red = 1.;
+                    green = 0.;
                     fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
-                       b_x1, b_y1, b_z1, 1.f, 0.f, 1.f, 1.f);
+                       b_x1, b_y1, b_z1, intensity, red, green, blue);
     	            ++k;
                 }
             }
@@ -376,17 +388,20 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
         offs_x = x1;//x*1.01666666666666 - x1*0.01666666666666;
         offs_y = y1;//y*1.01666666666666 - y1*0.01666666666666;
         offs_z = z1;//z*1.01666666666666 - z1*0.01666666666666;
+        red = 0.;
+        green = 0.;
+        blue = 1.;
         /* write current and next particle position */
         if(dvel > 0.0) {
             fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    x, -1.0*y, z, 1.f, 0.f, 0.f, 1.f);
+                    x, -1.0*y, z, intensity, red, green, blue);
             fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    offs_x, -1.0*offs_y, offs_z, 1.f, 0.f, 0.f, 1.f);
+                    offs_x, -1.0*offs_y, offs_z, intensity, red, green, blue);
         } else {
             fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    x, -1.0*y, z, 1.f, 1.f, 0.f, 0.f);
+                    x, -1.0*y, z, intensity, red, green, blue);
             fprintf(fp,"V %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n", 
-                    offs_x, -1.0*offs_y, offs_z, 1.f, 1.f, 0.f, 0.f);
+                    offs_x, -1.0*offs_y, offs_z, intensity, red, green, blue);
         }
 
         ++l;
