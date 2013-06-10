@@ -320,6 +320,10 @@ static void writestructs(SDF *sdfp, SDF *sdfp1, FILE *fp)
             blue = 0.;
             intensity = 1.0;
 
+        /* there is no catch if all particles are accreted, or if particle ids
+           become mismatched from reducing the file size through readsection3 
+           Thus, this while loop could go on forever (or rather, segfault by 
+           overrunning the bounds of idents */
             while(idents[k] < ident) {
                /* format: D/V x y z intensity r g b */
                fprintf(fp,"D %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f %+1.6f\n",
