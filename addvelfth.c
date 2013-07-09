@@ -329,6 +329,7 @@ static void writestructs(SDF *sdfp, FILE *fp)
             || (radius < set_radius)) {
 
             cos_angle = z/radius;
+            //cos_angle = fabs(z)/radius;
             if( theta < cos_angle) {
                 vx = vx * fboost * vfactor;
                 vy = vy * fboost * vfactor;
